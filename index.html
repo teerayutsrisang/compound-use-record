@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Batch Scanner → MS Form (Fixed ZXing Load)</title>
+  <title>Batch Scanner → MS Form (Robust Camera Start)</title>
   <style>
     :root{ --bg:#0b1220;--card:#0f172a;--border:#1f2a44;--text:#e5e7eb;--muted:#94a3b8;--primary:#0ea5e9;--secondary:#475569;--good:#10b981;--warn:#f59e0b;--danger:#ef4444; }
     *{box-sizing:border-box}
@@ -28,15 +28,18 @@
     .box.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px}
     .stack{display:flex;gap:10px}
     .stack .btn{flex:1 1 0}
-    .status{text-align:center;font-size:12px;color:var(--muted);min-height:16px}
+    .status{text-align:center;font-size:12px;color:#f0d48a;min-height:16px}
     .debug{margin-top:8px;font-size:11px;white-space:pre-wrap;background:#0b1326;border:1px solid #1f2a44;border-radius:10px;padding:8px}
+    .ok{color:#10b981} .bad{color:#ef4444}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>Scan Batch → Record</h1>
-      <div class="hint">Open over <b>HTTPS</b>. Allow the <b>Camera</b>. If opened inside other apps, long-press → <b>Open in Chrome/Safari</b>.</div>
+      <div class="hint">
+        Use <b>HTTPS</b> and allow <b>Camera</b>. If opened inside other apps, long‑press the link → <b>Open in Chrome/Safari</b>.
+      </div>
 
       <div class="camBox"><video id="video" playsinline muted></video></div>
 
@@ -63,14 +66,20 @@
       <div class="rowgap"></div>
       <button id="btnForm" class="btn secondary">Go to record on MS-Form</button>
 
-      <div class="status" id="status">Start Camera → SCAN. Rescan by tapping SCAN again.</div>
+      <div class="status" id="status">Tap Start Camera. If it fails, read messages below.</div>
       <div id="debug" class="debug" aria-live="polite"></div>
     </div>
   </div>
 
-  <!-- ZXing UMD bundles (library first, then browser helper). Using unpkg known-good filenames. -->
-  <script src="https://unpkg.com/@zxing/library@0.21.2/umd/index.min.js"></script>
-  <script src="https://unpkg.com/@zxing/browser@0.1.4/umd/ZXingBrowser.min.js"></script>
+  <!-- ZXing (two-step load with checks) -->
+  <script>
+    (function loadZXing(){
+      function add(src){ const s=document.createElement('script'); s.src=src; s.async=false; document.head.appendChild(s); return s; }
+      add('https://unpkg.com/@zxing/library@0.21.2/umd/index.min.js').onload = function(){
+        add('https://unpkg.com/@zxing/browser@0.1.4/umd/ZXingBrowser.min.js');
+      };
+    })();
+  </script>
 
   <script>
     const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
@@ -91,7 +100,9 @@
     };
     function log(s){ els.debug.textContent += s + "\\n"; }
 
-    let stream=null, deviceId=null, lastCode="", usedAction="";
+    let stream=null, lastCode="", usedAction="", deviceId=null;
+
+    // Time helpers: DD/MM/YYYY HH:MM
     function pad(n){ return String(n).padStart(2,'0'); }
     function toDDMMYYYY_HHMM(d){ return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
     function localNowStr(){ return toDDMMYYYY_HHMM(new Date()); }
@@ -113,44 +124,60 @@
     }
     function setScan(val, fmt){ lastCode = val || ""; els.scanValue.textContent = lastCode || "—"; els.status.textContent = fmt?("Format: "+fmt):""; updateInstruction(); }
 
-    async function waitForZXing(){
-      // Ensure global objects exist
-      for(let i=0;i<60;i++){ // ~3s
-        if(window.ZXingBrowser && window.ZXingBrowser.BrowserMultiFormatReader) return true;
-        await new Promise(r=>setTimeout(r,50));
-      }
-      return false;
-    }
+    function isSecure(){ return location.protocol === 'https:' || location.hostname === 'localhost'; }
 
     async function startCamera(){
       els.debug.textContent = "";
-      if(!(await waitForZXing())){
-        log("ZXing failed to load. Check network is not blocking unpkg.com.");
-        els.status.textContent = "Scanner library didn't load (network blocked). Try another network.";
-        return;
-      }
+      if(!isSecure()){ log("Not HTTPS/localhost → camera blocked by browser."); els.status.textContent = "Open this page over HTTPS."; return; }
+
+      if(window.top !== window.self){ log("Page is inside an in-app browser/iframe. Open directly in Chrome/Safari."); }
+
       try{
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio:false });
-        els.video.srcObject = stream; await els.video.play();
-        els.status.textContent = "Camera ready. Tap SCAN.";
-        log("getUserMedia() ok");
-        const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
-        const back = devices.find(d=>/back|rear|environment/i.test(d.label));
-        deviceId = (back || devices[0] || {}).deviceId || null;
-        log("Video inputs: " + devices.map(d=>d.label||'(no label)').join(' | '));
+        // Try environment exact, then ideal, then no facingMode
+        const tries = [
+          { video:{ facingMode:{ exact:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } }, audio:false },
+          { video:{ facingMode:{ ideal:'environment' }, width:{ ideal:1280 }, height:{ ideal:720 } }, audio:false },
+          { video:true, audio:false }
+        ];
+        let lastErr=null;
+        for(const c of tries){
+          try{
+            if(stream){ stream.getTracks().forEach(t=>t.stop()); }
+            stream = await navigator.mediaDevices.getUserMedia(c);
+            els.video.srcObject = stream; await els.video.play();
+            els.status.textContent = "Camera ready. Tap SCAN.";
+            log("getUserMedia OK with constraints: " + JSON.stringify(c));
+            break;
+          }catch(e){ lastErr=e; log("getUserMedia failed: " + (e.name?e.name+': '+e.message:e)); }
+        }
+        if(!stream){ els.status.textContent = "Camera blocked. See messages below."; return; }
+
+        // After permission, try enumerate and pick rear camera id
+        try{
+          if(window.ZXingBrowser && ZXingBrowser.BrowserCodeReader){
+            const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
+            const back = devices.find(d=>/back|rear|environment/i.test(d.label));
+            deviceId = (back || devices[0] || {}).deviceId || null;
+            log("Video inputs: " + devices.map(d=>d.label||'(no label)').join(' | '));
+          } else {
+            log("ZXing not loaded yet (ok, SCAN will wait).");
+          }
+        }catch(e){ log("Enumerate devices error: " + e); }
       }catch(e){
-        log("Start camera error: " + (e && e.name ? e.name+': '+e.message : e));
-        els.status.textContent = "Camera blocked. Use HTTPS and allow camera in browser settings.";
+        log("Start camera error: " + (e.name?e.name+': '+e.message:e));
+        els.status.textContent = "Could not start camera.";
       }
     }
 
+    async function waitForZXing(){
+      for(let i=0;i<60;i++){ if(window.ZXingBrowser && ZXingBrowser.BrowserMultiFormatReader) return true; await new Promise(r=>setTimeout(r,50)); }
+      return false;
+    }
+
     async function scanOnce(){
-      if(!(await waitForZXing())){
-        els.status.textContent = "Scanner library didn't load.";
-        return;
-      }
+      els.status.textContent = "Preparing scanner...";
+      if(!await waitForZXing()){ els.status.textContent = "Scanner library didn't load (network blocked?)."; log("ZXing not loaded"); return; }
       if(!stream){ els.status.textContent = "Start Camera first."; return; }
-      els.status.textContent = "Scanning... hold steady.";
       try{
         const reader = new ZXingBrowser.BrowserMultiFormatReader();
         reader.hints = new Map([
@@ -165,9 +192,10 @@
           ]],
           [ZXingBrowser.ZXing.DecodeHintType.TRY_HARDER, true]
         ]);
+        els.status.textContent = "Scanning...";
         const result = await reader.decodeOnceFromVideoDevice(deviceId || undefined, 'video');
         if(result){ setScan(result.getText(), result.getBarcodeFormat()); els.status.textContent="Scanned."; log("Decoded: "+result.getText()); }
-        else { els.status.textContent="No code found. Try again."; log("No result."); }
+        else { els.status.textContent="No code found. Try again."; log("No result (null)."); }
       }catch(e){
         const msg = e && e.name ? e.name+': '+e.message : (e+'');
         log("Decode error: " + msg);
