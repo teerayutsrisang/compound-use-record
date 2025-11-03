@@ -134,7 +134,7 @@
     <script>
         const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
         
-        // This is your correct Question ID
+        // --- THIS IS YOUR CORRECT QUESTION ID ---
         const BATCH_PARAM_NAME = "r64dd8a4e83d44a31b54a97344fe84d3a"; 
         
         const scanBtn = document.getElementById('scan-btn');
@@ -213,7 +213,7 @@
             formBtn.disabled = false;
         }
 
-        // --- THIS IS THE FIX ---
+        // --- THIS IS THE FIXED CODE ---
         formBtn.addEventListener('click', () => {
             const batchId = batchIdInput.value;
             
