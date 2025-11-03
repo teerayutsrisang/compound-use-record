@@ -1,0 +1,203 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Batch Scanner → MS Form (Native Minimal)</title>
+  <style>
+    :root{ --bg:#0b1220;--card:#0f172a;--border:#1f2a44;--text:#e5e7eb;--muted:#94a3b8;--primary:#0ea5e9;--secondary:#475569;--good:#10b981;--warn:#f59e0b;--danger:#ef4444; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:720px;margin:0 auto;padding:16px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
+    h1{margin:0 0 6px;font-size:22px}
+    .hint{color:var(--muted);font-size:12px;margin-bottom:12px}
+    .camBox{width:100%;height:1.5cm;max-height:2cm;margin:6px auto 10px;background:#000;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid #2a334d}
+    video{width:100%;height:100%;object-fit:cover;transform:none}
+    .btn{width:100%;padding:14px 16px;border-radius:12px;border:none;font-weight:800;font-size:16px;letter-spacing:.4px}
+    .primary{background:var(--primary);color:#fff}
+    .secondary{background:var(--secondary);color:#e5e7eb}
+    .good{background:var(--good);color:#fff}
+    .warn{background:var(--warn);color:#000}
+    .rowgap{height:10px}
+    .label{font-size:12px;color:var(--muted);margin:8px 4px 4px}
+    .result{text-align:center;font-weight:900;font-size:32px;letter-spacing:.5px;margin:8px 0;word-break:break-all;min-height:40px}
+    .box{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0b1326;color:var(--text)}
+    .box.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px}
+    .stack{display:flex;gap:10px}
+    .stack .btn{flex:1 1 0}
+    .status{text-align:center;font-size:12px;color:#f0d48a;min-height:16px}
+    .debug{margin-top:8px;font-size:11px;white-space:pre-wrap;background:#0b1326;border:1px solid #1f2a44;border-radius:10px;padding:8px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Scan Batch → Record</h1>
+      <div class="hint">
+        This version uses only built‑in browser features. Open over <b>HTTPS</b>. If opened inside another app, long‑press link → <b>Open in Chrome/Safari</b>.
+      </div>
+
+      <div class="camBox"><video id="video" playsinline muted></video></div>
+
+      <div class="rowgap"></div>
+      <div class="stack">
+        <button id="btnStart" class="btn primary">Start Camera</button>
+        <button id="btnScan" class="btn secondary">SCAN (native)</button>
+      </div>
+
+      <div id="scanValue" class="result">—</div>
+
+      <div class="label">Date &amp; time (editable)</div>
+      <input id="dtInput" class="box mono" />
+
+      <div class="rowgap"></div>
+      <div class="stack">
+        <button id="btnStartUse" class="btn good">START USE</button>
+        <button id="btnFinishUsed" class="btn warn">FINISH USED</button>
+      </div>
+
+      <div class="label">Instruction message (copy to paper)</div>
+      <textarea id="instruction" class="box mono" rows="3" readonly></textarea>
+
+      <div class="rowgap"></div>
+      <button id="btnForm" class="btn secondary">Go to record on MS-Form</button>
+
+      <div class="status" id="status">Tap Start Camera, then SCAN. If nothing happens, read messages below.</div>
+      <div id="debug" class="debug" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <script>
+    // Config
+    const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
+    const BATCH_PARAM = "BatchID";
+
+    const els = {
+      video: document.getElementById('video'),
+      btnStart: document.getElementById('btnStart'),
+      btnScan: document.getElementById('btnScan'),
+      btnStartUse: document.getElementById('btnStartUse'),
+      btnFinishUsed: document.getElementById('btnFinishUsed'),
+      btnForm: document.getElementById('btnForm'),
+      scanValue: document.getElementById('scanValue'),
+      dtInput: document.getElementById('dtInput'),
+      instruction: document.getElementById('instruction'),
+      status: document.getElementById('status'),
+      debug: document.getElementById('debug')
+    };
+    function log(s){ els.debug.textContent += s + "\\n"; }
+
+    let stream=null, lastCode="", usedAction="";
+    function pad(n){ return String(n).padStart(2,'0'); }
+    function toDDMMYYYY_HHMM(d){ return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+    function localNowStr(){ return toDDMMYYYY_HHMM(new Date()); }
+    function sanitizeTimeStr(s){
+      if(!s) return "";
+      let m=s.match(/^(\\d{4})-(\\d{2})-(\\d{2})\\s+(\\d{2}):(\\d{2})(?::\\d{2})?$/); if(m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
+      m=s.match(/^(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{2}):(\\d{2})(?::\\d{2})?$/); if(m) return `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}`;
+      return s;
+    }
+    els.dtInput.value = localNowStr();
+
+    function updateInstruction(){
+      if(!lastCode){ els.instruction.value = ""; return; }
+      els.dtInput.value = sanitizeTimeStr(els.dtInput.value);
+      const dt = els.dtInput.value || localNowStr();
+      const act = usedAction || "(select START/FINISH)";
+      els.instruction.value = `BATCH: ${lastCode} | TIME: ${dt} | ACTION: ${act}`;
+      try{ localStorage.setItem('lastInstruction', els.instruction.value); }catch{}
+    }
+    function setScan(val){ lastCode = val || ""; els.scanValue.textContent = lastCode || "—"; updateInstruction(); }
+
+    function isSecure(){ return location.protocol === 'https:' || location.hostname === 'localhost'; }
+
+    async function startCamera(){
+      els.debug.textContent = "";
+      if(!isSecure()){ log("Not HTTPS/localhost → camera blocked by browser."); els.status.textContent = "Open this page over HTTPS."; return; }
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        log("mediaDevices.getUserMedia not available."); els.status.textContent = "Camera API not available in this browser."; return;
+      }
+      try{
+        // Try rear camera exact → ideal → any
+        const tries=[
+          { video:{ facingMode:{ exact:'environment' } }, audio:false },
+          { video:{ facingMode:{ ideal:'environment' } }, audio:false },
+          { video:true, audio:false }
+        ];
+        for(const c of tries){
+          try{
+            if(stream){ stream.getTracks().forEach(t=>t.stop()); }
+            stream = await navigator.mediaDevices.getUserMedia(c);
+            els.video.srcObject = stream; await els.video.play();
+            els.status.textContent = "Camera ready. Tap SCAN.";
+            log("getUserMedia OK: " + JSON.stringify(c));
+            return;
+          }catch(e){ log("getUserMedia failed: " + (e.name?e.name+': '+e.message:e)); }
+        }
+        els.status.textContent = "Camera blocked. See messages below.";
+      }catch(e){
+        els.status.textContent = "Could not start camera."; log("Start error: " + (e.name?e.name+': '+e.message:e));
+      }
+    }
+
+    async function scanNative(){
+      if(!stream){ els.status.textContent = "Start Camera first."; return; }
+      if(!('BarcodeDetector' in window)){
+        els.status.textContent = "BarcodeDetector not supported on this browser.";
+        log("No BarcodeDetector API."); return;
+      }
+      els.status.textContent = "Scanning single frame...";
+      try{
+        const track = stream.getVideoTracks()[0];
+        // Try ImageCapture frame if available; else draw from <video>
+        if('ImageCapture' in window){
+          try{
+            const cap = new ImageCapture(track);
+            const bmp = await cap.grabFrame();
+            const canvas = document.createElement('canvas');
+            canvas.width = bmp.width; canvas.height = bmp.height;
+            canvas.getContext('2d').drawImage(bmp,0,0);
+            const blob = await new Promise(r=>canvas.toBlob(r));
+            const imgBitmap = await createImageBitmap(blob);
+            const detector = new BarcodeDetector({formats:['code_39','code_128','ean_13','ean_8','upc_a','itf','qr_code']});
+            const codes = await detector.detect(imgBitmap);
+            if(codes && codes.length){ setScan(codes[0].rawValue); els.status.textContent = "Scanned (native)."; return; }
+          }catch(e){ log("ImageCapture path error: "+(e.name?e.name+': '+e.message:e)); }
+        }
+        // Fallback: draw current <video> frame
+        const canvas = document.createElement('canvas');
+        const rect = els.video.getBoundingClientRect();
+        canvas.width = rect.width; canvas.height = rect.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(els.video,0,0,canvas.width,canvas.height);
+        const blob = await new Promise(r=>canvas.toBlob(r));
+        const imgBitmap = await createImageBitmap(blob);
+        const detector = new BarcodeDetector({formats:['code_39','code_128','ean_13','ean_8','upc_a','itf','qr_code']});
+        const codes = await detector.detect(imgBitmap);
+        if(codes && codes.length){ setScan(codes[0].rawValue); els.status.textContent = "Scanned (native)."; }
+        else { els.status.textContent = "No code found. Re-aim and try again."; }
+      }catch(e){
+        els.status.textContent = "Scan failed."; log("Scan error: " + (e.name?e.name+': '+e.message:e));
+      }
+    }
+
+    function chooseAction(act){ usedAction = act; updateInstruction(); }
+    async function goToForm(){
+      if(!lastCode){ alert("Scan a barcode first"); return; }
+      try{ await navigator.clipboard.writeText(els.instruction.value); localStorage.setItem('lastInstruction', els.instruction.value); }catch{}
+      try{ const u=new URL(FORMS_URL); u.searchParams.set(BATCH_PARAM,lastCode); window.location.href=u.toString(); }
+      catch{ window.location.href = FORMS_URL; }
+    }
+
+    els.btnStart.addEventListener('click', startCamera);
+    els.btnScan.addEventListener('click', scanNative);
+    els.btnStartUse.addEventListener('click', ()=>chooseAction('START USE'));
+    els.btnFinishUsed.addEventListener('click', ()=>chooseAction('FINISH USED'));
+    els.btnForm.addEventListener('click', goToForm);
+    els.dtInput.addEventListener('input', updateInstruction);
+  </script>
+</body>
+</html>
