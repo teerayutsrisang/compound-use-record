@@ -1,217 +1,252 @@
-
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Batch Scanner → MS Form (Fail‑Safe)</title>
-  <style>
-    :root{ --bg:#0b1220;--card:#0f172a;--border:#1f2a44;--text:#e5e7eb;--muted:#94a3b8;--primary:#0ea5e9;--secondary:#475569;--good:#10b981;--warn:#f59e0b; }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
-    .wrap{max-width:720px;margin:0 auto;padding:16px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
-    h1{margin:0 0 6px;font-size:22px}
-    .hint{color:var(--muted);font-size:12px;margin-bottom:12px}
-    .camBox{width:100%;height:1.5cm;max-height:2cm;margin:6px auto 10px;background:#000;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid #2a334d}
-    video{width:100%;height:100%;object-fit:cover}
-    .btn{width:100%;padding:14px 16px;border-radius:12px;border:none;font-weight:800;font-size:16px;letter-spacing:.4px}
-    .primary{background:var(--primary);color:#fff}
-    .secondary{background:var(--secondary);color:#e5e7eb}
-    .good{background:var(--good);color:#fff}
-    .warn{background:var(--warn);color:#000}
-    .rowgap{height:10px}
-    .label{font-size:12px;color:var(--muted);margin:8px 4px 4px}
-    .resultInput{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0b1326;color:#e5e7eb;
-                 font-weight:900;font-size:32px;letter-spacing:.5px;text-align:center}
-    .box{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0b1326;color:#e5e7eb}
-    .box.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px}
-    .stack{display:flex;gap:10px}
-    .stack .btn{flex:1 1 0}
-    .status{text-align:center;font-size:12px;color:#94a3b8;min-height:16px}
-    .debug{margin-top:8px;font-size:11px;white-space:pre-wrap;background:#0b1326;border:1px solid #1f2a44;border-radius:10px;padding:8px}
-    .hidden{display:none}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch Scanner (to MS Form)</title>
+    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            margin: 0; 
+            padding: 10px; 
+            background-color: #f4f4f9; 
+            color: #333;
+        }
+        #container { 
+            max-width: 600px; 
+            margin: 0 auto; 
+            background: #fff; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+            padding: 20px; 
+        }
+        h1 { text-align: center; margin-top: 0; }
+        
+        /* This is the box where the camera will appear */
+        #qr-reader {
+            width: 100%;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            margin-top: 15px;
+            /* It is hidden until you press "Scan" */
+            display: none; 
+        }
+
+        #scan-btn {
+            width: 100%;
+            font-size: 1.5em;
+            padding: 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .label {
+            font-size: 12px;
+            color: #6c757d;
+            margin: 15px 0 5px 0;
+        }
+        .resultInput {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #ccc;
+            background: #f4f4f9;
+            color: #333;
+            font-weight: bold;
+            font-size: 24px;
+            text-align: center;
+            box-sizing: border-box; /* Important fix */
+        }
+        
+        .button-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 15px; 
+            margin-top: 15px;
+        }
+        .action-btn, #btn-form {
+            font-size: 1.2em;
+            padding: 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            color: white;
+        }
+        
+        #btn-start { background-color: #28a745; }
+        #btn-finish { background-color: #dc3545; }
+        
+        #instruction {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-family: monospace;
+            font-size: 14px;
+            background: #f4f4f9;
+            min-height: 80px;
+        }
+        
+        #btn-form {
+            width: 100%;
+            margin-top: 15px;
+            background: #6c757d;
+        }
+        
+        #status { 
+            margin-top: 15px; 
+            font-weight: bold; 
+            text-align: center; 
+            font-size: 1em; 
+            color: #007bff;
+            min-height: 1.5em;
+        }
+    </style>
 </head>
 <body>
-  <div class="wrap">
-    <div class="card">
-      <h1>Scan Batch → Record (Fail‑Safe)</h1>
-      <div class="hint">
-        Use over <b>HTTPS</b> in <b>Chrome</b>. If the camera is blocked, use <b>Scan from photo</b>.
-      </div>
 
-      <div class="camBox"><video id="video" playsinline muted></video></div>
+    <div id="container">
+        <h1>Batch Logger</h1>
+        
+        <button id="scan-btn">1. Scan Batch</button>
+        
+        <div id="qr-reader"></div>
 
-      <div class="rowgap"></div>
-      <div class="stack">
-        <button id="btnStart" class="btn primary">Start camera</button>
-        <button id="btnScan" class="btn secondary">Start live scan</button>
-        <button id="btnRescan" class="btn secondary hidden">Rescan</button>
-      </div>
+        <div class="label">Batch ID:</div>
+        <input id="batch-id" class="resultInput" placeholder="Scan or type ID...">
 
-      <div class="rowgap"></div>
-      <div class="stack">
-        <input id="fileInput" type="file" accept="image/*" capture="environment" class="hidden"/>
-        <button id="btnPhoto" class="btn secondary">Scan from photo</button>
-        <button id="btnStop" class="btn warn">Stop camera</button>
-      </div>
+        <div class="button-grid">
+            <button id="btn-start" class="action-btn">2. START USE</button>
+            <button id="btn-finish" class="action-btn">2. FINISH USED</button>
+        </div>
+        
+        <div class="label">Data to Record:</div>
+        <textarea id="instruction" readonly>Scan a code and select an action...</textarea>
 
-      <div class="label">Scan result (editable)</div>
-      <input id="codeInput" class="resultInput" placeholder="—" />
-
-      <div class="label">Date &amp; time (editable)</div>
-      <input id="dtInput" class="box mono" />
-
-      <div class="rowgap"></div>
-      <div class="stack">
-        <button id="btnStartUse" class="btn good">START USE</button>
-        <button id="btnFinishUsed" class="btn warn">FINISH USED</button>
-      </div>
-
-      <div class="label">Instruction message (copy to paper)</div>
-      <textarea id="instruction" class="box mono" rows="3" readonly></textarea>
-
-      <div class="rowgap"></div>
-      <button id="btnForm" class="btn secondary">Go to record on MS-Form</button>
-
-      <div class="status" id="status">Start camera → Start live scan, or use “Scan from photo”.</div>
-      <div id="debug" class="debug" aria-live="polite"></div>
+        <button id="btn-form" disabled>3. Go to MS-Form to Save</button>
+        
+        <div id="status"></div>
     </div>
-  </div>
 
-  <script>
-    const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
-    const BATCH_PARAM = "BatchID";
-    const els = {
-      video: document.getElementById('video'),
-      btnStart: document.getElementById('btnStart'),
-      btnScan: document.getElementById('btnScan'),
-      btnRescan: document.getElementById('btnRescan'),
-      btnStop: document.getElementById('btnStop'),
-      btnPhoto: document.getElementById('btnPhoto'),
-      fileInput: document.getElementById('fileInput'),
-      btnStartUse: document.getElementById('btnStartUse'),
-      btnFinishUsed: document.getElementById('btnFinishUsed'),
-      btnForm: document.getElementById('btnForm'),
-      codeInput: document.getElementById('codeInput'),
-      dtInput: document.getElementById('dtInput'),
-      instruction: document.getElementById('instruction'),
-      status: document.getElementById('status'),
-      debug: document.getElementById('debug')
-    };
-    function log(s){ els.debug.textContent += s + "\\n"; }
+    <script>
+        // --- This is the same MS Form URL from your file ---
+        const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
+        
+        // This is the "question name" in your form to pre-fill
+        // Check your form to make sure this is correct. I am guessing it is 'BatchID'.
+        const BATCH_PARAM_NAME = "r"_YOUR_QUESTION_ID_HERE"; // IMPORTANT: See note below
+        
+        // Get all the buttons and fields
+        const scanBtn = document.getElementById('scan-btn');
+        const qrReaderDiv = document.getElementById('qr-reader');
+        const batchIdInput = document.getElementById('batch-id');
+        const startBtn = document.getElementById('btn-start');
+        const finishBtn = document.getElementById('btn-finish');
+        const instructionText = document.getElementById('instruction');
+        const formBtn = document.getElementById('btn-form');
+        const statusDiv = document.getElementById('status');
+        
+        let lastAction = "";
+        
+        // Initialize the scanner
+        const html5QrCode = new Html5Qrcode("qr-reader");
 
-    let stream=null, scanning=false, rafId=null, usedAction="";
-    const detector = ('BarcodeDetector' in window) ? new BarcodeDetector({formats:['code_39','code_128','ean_13','ean_8','upc_a','itf','qr_code']}) : null;
+        // --- Scan Button Logic ---
+        scanBtn.addEventListener('click', () => {
+            qrReaderDiv.style.display = 'block';
+            statusDiv.textContent = 'Starting camera...';
+            
+            html5QrCode.start(
+                { facingMode: "environment" }, // Use back camera
+                { 
+                    fps: 10, 
+                    qrbox: { width: 250, height: 250 } 
+                },
+                onScanSuccess,  // This function is called on success
+                onScanFailure   // This is called on failure
+            ).catch(err => {
+                statusDiv.textContent = 'Error: Cannot start camera. Check permissions.';
+            });
+        });
 
-    function pad(n){ return String(n).padStart(2,'0'); }
-    function toDDMMYYYY_HHMM(d){ return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
-    function localNowStr(){ return toDDMMYYYY_HHMM(new Date()); }
-    function sanitizeTimeStr(s){
-      if(!s) return "";
-      let m=s.match(/^(\\d{4})-(\\d{2})-(\\d{2})\\s+(\\d{2}):(\\d{2})(?::\\d{2})?$/); if(m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
-      m=s.match(/^(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{2}):(\\d{2})(?::\\d{2})?$/); if(m) return `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}`;
-      return s;
-    }
-    els.dtInput.value = localNowStr();
+        function onScanSuccess(decodedText, decodedResult) {
+            // Stop the camera
+            html5QrCode.stop().catch(err => console.warn("Scanner stop failed."));
+            qrReaderDiv.style.display = 'none';
+            
+            // Put the result in the box
+            batchIdInput.value = decodedText;
+            statusDiv.textContent = `Scan Successful: ${decodedText}`;
+            updateInstruction();
+        }
 
-    function currentCode(){ return (els.codeInput.value || "").trim(); }
-    function updateInstruction(){
-      const code = currentCode();
-      if(!code){ els.instruction.value = ""; return; }
-      els.dtInput.value = sanitizeTimeStr(els.dtInput.value);
-      const dt = els.dtInput.value || localNowStr();
-      const act = usedAction || "(select START/FINISH)";
-      els.instruction.value = `BATCH: ${code} | TIME: ${dt} | ACTION: ${act}`;
-      try{ localStorage.setItem('lastInstruction', els.instruction.value); }catch{}
-    }
-    els.codeInput.addEventListener('input', updateInstruction);
-    els.dtInput.addEventListener('input', updateInstruction);
-    function setScan(val){ els.codeInput.value = val || ""; updateInstruction(); }
+        function onScanFailure(error) {
+            // This just ignores scans that don't work
+        }
 
-    function isSecure(){ return location.protocol === 'https:' || location.hostname === 'localhost'; }
+        // --- Action Button Logic ---
+        startBtn.addEventListener('click', () => {
+            lastAction = 'START';
+            updateInstruction();
+        });
+        
+        finishBtn.addEventListener('click', () => {
+            lastAction = 'FINISH';
+            updateInstruction();
+        });
+        
+        batchIdInput.addEventListener('input', updateInstruction); // Also update if they type
 
-    async function startCamera(){
-      els.debug.textContent='';
-      if(!isSecure()){ els.status.textContent="Open this page over HTTPS."; log("Not HTTPS → camera blocked."); return; }
-      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ els.status.textContent="Camera API not available in this browser."; log("getUserMedia missing."); return; }
-      const tries=[
-        { video:{ facingMode:{ exact:'environment' }, width:{ideal:1280}, height:{ideal:720} }, audio:false },
-        { video:{ facingMode:{ ideal:'environment' }, width:{ideal:1280}, height:{ideal:720} }, audio:false },
-        { video:true, audio:false }
-      ];
-      for(const c of tries){
-        try{
-          if(stream){ stream.getTracks().forEach(t=>t.stop()); }
-          stream = await navigator.mediaDevices.getUserMedia(c);
-          els.video.srcObject = stream; await els.video.play();
-          els.status.textContent = "Camera ready.";
-          log("getUserMedia OK: " + JSON.stringify(c));
-          return;
-        }catch(e){ log("getUserMedia failed: " + (e.name?e.name+': '+e.message:e)); }
-      }
-      els.status.textContent = "Camera blocked. Use Scan from photo.";
-    }
-    function stopCamera(){
-      scanning=false; if(rafId) cancelAnimationFrame(rafId);
-      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
-      els.status.textContent="Camera stopped.";
-    }
+        function updateInstruction() {
+            const batchId = batchIdInput.value;
+            if (!batchId) {
+                instructionText.value = 'Scan a code and select an action...';
+                formBtn.disabled = true;
+                return;
+            }
+            
+            if (!lastAction) {
+                instructionText.value = `BATCH: ${batchId} | ACTION: (Please select START or FINISH)`;
+                formBtn.disabled = true;
+                return;
+            }
+            
+            // Get current time
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            
+            instructionText.value = `BATCH: ${batchId} | ACTION: ${lastAction} | TIME: ${time}`;
+            formBtn.disabled = false; // Enable the "Go to Form" button
+        }
 
-    function startLiveScan(){
-      if(!detector){ els.status.textContent="BarcodeDetector not available. Use Chrome 94+."; log("No BarcodeDetector."); return; }
-      if(!stream){ els.status.textContent="Start camera first."; return; }
-      if(scanning) return;
-      scanning=true; els.btnScan.classList.add('hidden'); els.btnRescan.classList.remove('hidden');
-      els.status.textContent="Scanning... hold steady over one barcode row.";
-      const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
-      const loop = async () => {
-        if(!scanning) return;
-        try{
-          const rect = els.video.getBoundingClientRect();
-          if(canvas.width!==rect.width || canvas.height!==rect.height){ canvas.width=rect.width; canvas.height=rect.height; }
-          ctx.drawImage(els.video,0,0,canvas.width,canvas.height);
-          const bitmap = await createImageBitmap(canvas);
-          const codes = await detector.detect(bitmap);
-          if(codes && codes.length){ setScan(codes[0].rawValue); els.status.textContent="Scanned."; scanning=false; return; }
-        }catch(_){} rafId=requestAnimationFrame(loop);
-      }; rafId=requestAnimationFrame(loop);
-    }
-    function rescan(){ scanning=false; if(rafId) cancelAnimationFrame(rafId); els.btnRescan.classList.add('hidden'); els.btnScan.classList.remove('hidden'); els.status.textContent="Ready to scan."; setScan(""); }
+        // --- Go to Form Button Logic ---
+        formBtn.addEventListener('click', () => {
+            const batchId = batchIdInput.value;
+            
+            if (!batchId || !lastAction) {
+                alert("Please scan a code and select START or FINISH.");
+                return;
+            }
 
-    async function scanFromPhoto(file){
-      if(!file){ return; }
-      if(!detector){ els.status.textContent="BarcodeDetector not available."; return; }
-      try{
-        els.status.textContent="Detecting from photo...";
-        const img = await createImageBitmap(file);
-        const codes = await detector.detect(img);
-        if(codes && codes.length){ setScan(codes[0].rawValue); els.status.textContent="Scanned from photo."; }
-        else { els.status.textContent="No code found in photo."; }
-      }catch(e){ els.status.textContent="Photo scan failed."; }
-    }
+            // This is the new, better way to pre-fill a form
+            const url = new URL(FORMS_URL);
+            
+            // This pre-fills the form with a JSON object.
+            // This is the official way to pre-fill multiple fields.
+            const prefillData = {
+                [BATCH_PARAM_NAME]: instructionText.value // Pass the full instruction string
+            };
+            
+            url.searchParams.set('data', JSON.stringify(prefillData));
+            
+            window.location.href = url.toString();
+        });
 
-    function chooseAction(act){ usedAction=act; updateInstruction(); }
-    async function goToForm(){
-      const code = currentCode();
-      if(!code){ alert("Scan (or type) a code first"); return; }
-      try{ await navigator.clipboard.writeText(els.instruction.value); localStorage.setItem('lastInstruction', els.instruction.value); }catch{}
-      try{ const u=new URL(FORMS_URL); u.searchParams.set(BATCH_PARAM,code); window.location.href=u.toString(); }
-      catch{ window.location.href = FORMS_URL; }
-    }
-
-    // Events
-    els.btnStart.addEventListener('click', startCamera);
-    els.btnStop.addEventListener('click', stopCamera);
-    els.btnScan.addEventListener('click', startLiveScan);
-    els.btnRescan.addEventListener('click', rescan);
-    els.btnPhoto.addEventListener('click', ()=> els.fileInput.click());
-    els.fileInput.addEventListener('change', e=> scanFromPhoto(e.target.files[0]));
-    els.btnStartUse.addEventListener('click', ()=>chooseAction('START USE'));
-    els.btnFinishUsed.addEventListener('click', ()=>chooseAction('FINISH USED'));
-    els.btnForm.addEventListener('click', goToForm);
-  </script>
+    </script>
 </body>
 </html>
