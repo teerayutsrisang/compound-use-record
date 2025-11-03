@@ -134,7 +134,7 @@
     <script>
         const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
         
-        // --- THIS IS YOUR CORRECT QUESTION ID ---
+        // This is your correct Question ID
         const BATCH_PARAM_NAME = "r64dd8a4e83d44a31b54a97344fe84d3a"; 
         
         const scanBtn = document.getElementById('scan-btn');
@@ -148,7 +148,7 @@
         
         let lastAction = "";
         
-        const html5QrCode = new Html5Qrcode("qr-reader");
+        const html5QrCode = new Html5QrCode("qr-reader");
 
         scanBtn.addEventListener('click', () => {
             qrReaderDiv.style.display = 'block';
@@ -192,6 +192,8 @@
         
         batchIdInput.addEventListener('input', updateInstruction);
 
+        
+        // --- THIS IS THE UPDATED FUNCTION ---
         function updateInstruction() {
             const batchId = batchIdInput.value;
             if (!batchId) {
@@ -201,19 +203,28 @@
             }
             
             if (!lastAction) {
-                instructionText.value = `BATCH: ${batchId} | ACTION: (Please select START or FINISH)`;
+                // This message is just a temporary instruction
+                instructionText.value = `Scanned: ${batchId}. Now select START or FINISH.`;
                 formBtn.disabled = true;
                 return;
             }
             
+            // Get current date and time
             const now = new Date();
-            const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const dateTimeString = now.toLocaleString('en-US', { 
+                year: 'numeric', 
+                month: 'numeric', 
+                day: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            }); // e.g., "11/3/2025, 8:31 PM"
             
-            instructionText.value = `BATCH: ${batchId} | ACTION: ${lastAction} | TIME: ${time}`;
+            // This is your new, clean data format
+            instructionText.value = `${batchId}, ${lastAction}, ${dateTimeString}`;
             formBtn.disabled = false;
         }
 
-        // --- THIS IS THE FIXED CODE ---
+        
         formBtn.addEventListener('click', () => {
             const batchId = batchIdInput.value;
             
@@ -224,8 +235,7 @@
 
             const url = new URL(FORMS_URL);
             
-            // This is the simple, more reliable pre-fill method.
-            // It adds '&r64dd8a4...=DATA' to the URL.
+            // This is the simple, reliable pre-fill method.
             url.searchParams.set(BATCH_PARAM_NAME, instructionText.value);
             
             window.location.href = url.toString();
