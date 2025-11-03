@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Batch Scanner → MS Form (Editable Result)</title>
+  <title>Batch Scanner → MS Form (Editable + Debug)</title>
   <style>
     :root{
       --bg:#0b1220;--card:#0f172a;--border:#1f2a44;--text:#e5e7eb;--muted:#94a3b8;
@@ -17,7 +17,7 @@
     .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
     h1{margin:0 0 6px;font-size:22px}
     .hint{color:var(--muted);font-size:12px;margin-bottom:12px}
-    /* Camera slit: full width, ~1.5cm tall */
+    /* Camera slit */
     .camBox{width:100%;height:1.5cm;max-height:2cm;margin:6px auto 10px;background:#000;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid #2a334d}
     video{width:100%;height:100%;object-fit:cover;transform:none}
     .btn{width:100%;padding:14px 16px;border-radius:12px;border:none;font-weight:800;font-size:16px;letter-spacing:.4px}
@@ -35,6 +35,7 @@
     .stack .btn{flex:1 1 0}
     .status{text-align:center;font-size:12px;color:#94a3b8;min-height:16px}
     .small{font-size:12px;color:#94a3b8}
+    .debug{margin-top:8px;font-size:11px;white-space:pre-wrap;background:#0b1326;border:1px solid #1f2a44;border-radius:10px;padding:8px}
   </style>
 </head>
 <body>
@@ -71,12 +72,12 @@
       <div class="rowgap"></div>
       <button id="btnForm" class="btn secondary">Go to record on MS-Form</button>
 
-      <div class="status" id="status">Start Camera → SCAN (you can edit the result and press SCAN again to rescan).</div>
-      <div class="small" style="margin-top:8px;">Tip: After opening the form, long-press the first field and Paste.</div>
+      <div class="status" id="status">Start Camera → SCAN (you can edit the result; press SCAN again to rescan).</div>
+      <div id="debug" class="debug" aria-live="polite"></div>
     </div>
   </div>
 
-  <!-- ZXing (same as the working build) -->
+  <!-- ZXing (same as your working build) -->
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
   <script>
     const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
@@ -93,8 +94,10 @@
       codeInput: document.getElementById('codeInput'),
       dtInput: document.getElementById('dtInput'),
       instruction: document.getElementById('instruction'),
-      status: document.getElementById('status')
+      status: document.getElementById('status'),
+      debug: document.getElementById('debug')
     };
+    function log(s){ els.debug.textContent += s + "\\n"; }
 
     // Time: DD/MM/YYYY HH:MM (no seconds)
     function pad(n){ return String(n).padStart(2,'0'); }
@@ -128,21 +131,36 @@
       try{ els.codeInput.focus(); els.codeInput.setSelectionRange(els.codeInput.value.length, els.codeInput.value.length); }catch{}
     }
 
+    function isSecure(){ return location.protocol === 'https:' || location.hostname === 'localhost'; }
+
     async function startCamera(){
+      els.debug.textContent = "";
+      if(!isSecure()){ els.status.textContent = "Open this page over HTTPS."; log("Not HTTPS/localhost → camera blocked."); return; }
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        els.status.textContent = "Camera API not available in this browser.";
+        log("mediaDevices.getUserMedia missing.");
+        return;
+      }
       try{
-        // exact → ideal rear camera
-        let constraints = { video: { facingMode: { exact: 'environment' } }, audio:false };
-        try{
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-        }catch(_){
-          constraints = { video: { facingMode: { ideal: 'environment' } }, audio:false };
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        // exact → ideal → any camera
+        const tries = [
+          { video: { facingMode: { exact: 'environment' }, width:{ideal:1280}, height:{ideal:720} }, audio:false },
+          { video: { facingMode: { ideal: 'environment' }, width:{ideal:1280}, height:{ideal:720} }, audio:false },
+          { video: true, audio:false }
+        ];
+        for(const c of tries){
+          try{
+            if(stream){ stream.getTracks().forEach(t=>t.stop()); }
+            stream = await navigator.mediaDevices.getUserMedia(c);
+            els.video.srcObject = stream; await els.video.play();
+            els.status.textContent = "Camera ready. Tap SCAN.";
+            log("getUserMedia OK with: " + JSON.stringify(c));
+            return;
+          }catch(e){ log("getUserMedia failed: " + (e.name?e.name+': '+e.message:e)); }
         }
-        els.video.srcObject = stream; await els.video.play();
-        els.status.textContent = "Camera ready. Tap SCAN.";
+        els.status.textContent = "Camera blocked. See messages below.";
       }catch(e){
-        console.warn(e);
-        els.status.textContent = "Camera blocked. Use HTTPS and allow camera in browser settings.";
+        els.status.textContent = "Could not start camera."; log("Start error: " + (e.name?e.name+': '+e.message:e));
       }
     }
     function stopCamera(){ if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } }
@@ -150,6 +168,9 @@
     async function scanOnce(){
       if(!stream){ els.status.textContent="Start Camera first"; return; }
       els.status.textContent = "Scanning...";
+      if(!window.ZXingBrowser || !ZXingBrowser.BrowserMultiFormatReader){
+        els.status.textContent = "Scanner library not loaded (network?)."; log("ZXingBrowser not ready."); return;
+      }
       try{
         const reader = new ZXingBrowser.BrowserMultiFormatReader();
         reader.hints = new Map([
@@ -165,11 +186,10 @@
           [ZXingBrowser.ZXing.DecodeHintType.TRY_HARDER, true]
         ]);
         const result = await reader.decodeOnceFromVideoDevice(undefined, 'video');
-        if(result){ setScan(result.getText(), result.getBarcodeFormat()); els.status.textContent="Scanned. Edit if needed, or press SCAN again to rescan."; }
+        if(result){ setScan(result.getText(), result.getBarcodeFormat()); els.status.textContent="Scanned. Edit or press SCAN again to rescan."; }
         else { els.status.textContent="No code found. Try again."; }
       }catch(e){
-        console.warn(e);
-        els.status.textContent="Scan error. Re-aim and try again.";
+        els.status.textContent="Scan error. Re-aim and try again."; log("Decode error: " + (e.name?e.name+': '+e.message:e));
       }
     }
 
