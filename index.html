@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Batch Scanner → MS Form (Android/iOS Stable)</title>
+  <title>Batch Scanner → MS Form (Fixed ZXing Load)</title>
   <style>
     :root{ --bg:#0b1220;--card:#0f172a;--border:#1f2a44;--text:#e5e7eb;--muted:#94a3b8;--primary:#0ea5e9;--secondary:#475569;--good:#10b981;--warn:#f59e0b;--danger:#ef4444; }
     *{box-sizing:border-box}
@@ -21,7 +21,6 @@
     .secondary{background:var(--secondary);color:#e5e7eb}
     .good{background:var(--good);color:#fff}
     .warn{background:var(--warn);color:#000}
-    .danger{background:var(--danger);color:#fff}
     .rowgap{height:10px}
     .label{font-size:12px;color:var(--muted);margin:8px 4px 4px}
     .result{text-align:center;font-weight:900;font-size:36px;letter-spacing:1px;margin:8px 0;word-break:break-all;min-height:44px}
@@ -30,7 +29,6 @@
     .stack{display:flex;gap:10px}
     .stack .btn{flex:1 1 0}
     .status{text-align:center;font-size:12px;color:var(--muted);min-height:16px}
-    .small{font-size:12px;color:var(--muted)}
     .debug{margin-top:8px;font-size:11px;white-space:pre-wrap;background:#0b1326;border:1px solid #1f2a44;border-radius:10px;padding:8px}
   </style>
 </head>
@@ -38,20 +36,15 @@
   <div class="wrap">
     <div class="card">
       <h1>Scan Batch → Record</h1>
-      <div class="hint">
-        Use <b>HTTPS</b> and allow the <b>Camera</b>. If opened inside other apps, long‑press the link → <b>Open in Chrome/Safari</b>.
-      </div>
+      <div class="hint">Open over <b>HTTPS</b>. Allow the <b>Camera</b>. If opened inside other apps, long-press → <b>Open in Chrome/Safari</b>.</div>
 
       <div class="camBox"><video id="video" playsinline muted></video></div>
 
       <div class="rowgap"></div>
       <div class="stack">
         <button id="btnStart" class="btn primary">Start Camera</button>
-        <button id="btnTest" class="btn secondary">Test Frame</button>
+        <button id="btnScan" class="btn secondary">SCAN</button>
       </div>
-
-      <div class="rowgap"></div>
-      <button id="btnScan" class="btn good">SCAN</button>
 
       <div id="scanValue" class="result">—</div>
 
@@ -70,12 +63,15 @@
       <div class="rowgap"></div>
       <button id="btnForm" class="btn secondary">Go to record on MS-Form</button>
 
-      <div class="status" id="status">Tap Start Camera → SCAN. If SCAN does nothing, tap <b>Test Frame</b> and tell me the message below.</div>
+      <div class="status" id="status">Start Camera → SCAN. Rescan by tapping SCAN again.</div>
       <div id="debug" class="debug" aria-live="polite"></div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
+  <!-- ZXing UMD bundles (library first, then browser helper). Using unpkg known-good filenames. -->
+  <script src="https://unpkg.com/@zxing/library@0.21.2/umd/index.min.js"></script>
+  <script src="https://unpkg.com/@zxing/browser@0.1.4/umd/ZXingBrowser.min.js"></script>
+
   <script>
     const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
     const BATCH_PARAM = "BatchID";
@@ -84,7 +80,6 @@
       video: document.getElementById('video'),
       btnStart: document.getElementById('btnStart'),
       btnScan: document.getElementById('btnScan'),
-      btnTest: document.getElementById('btnTest'),
       btnStartUse: document.getElementById('btnStartUse'),
       btnFinishUsed: document.getElementById('btnFinishUsed'),
       btnForm: document.getElementById('btnForm'),
@@ -94,18 +89,16 @@
       status: document.getElementById('status'),
       debug: document.getElementById('debug')
     };
+    function log(s){ els.debug.textContent += s + "\\n"; }
 
-    let stream=null, deviceId=null, reader=null, lastCode="", usedAction="";
-    function log(s){ els.debug.textContent += (s+"\n"); }
-
-    // Time helpers: DD/MM/YYYY HH:MM
+    let stream=null, deviceId=null, lastCode="", usedAction="";
     function pad(n){ return String(n).padStart(2,'0'); }
     function toDDMMYYYY_HHMM(d){ return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
     function localNowStr(){ return toDDMMYYYY_HHMM(new Date()); }
     function sanitizeTimeStr(s){
       if(!s) return "";
-      let m=s.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})(?::\d{2})?$/); if(m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
-      m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})(?::\d{2})?$/); if(m) return `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}`;
+      let m=s.match(/^(\\d{4})-(\\d{2})-(\\d{2})\\s+(\\d{2}):(\\d{2})(?::\\d{2})?$/); if(m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
+      m=s.match(/^(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{2}):(\\d{2})(?::\\d{2})?$/); if(m) return `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}`;
       return s;
     }
     els.dtInput.value = localNowStr();
@@ -120,81 +113,65 @@
     }
     function setScan(val, fmt){ lastCode = val || ""; els.scanValue.textContent = lastCode || "—"; els.status.textContent = fmt?("Format: "+fmt):""; updateInstruction(); }
 
+    async function waitForZXing(){
+      // Ensure global objects exist
+      for(let i=0;i<60;i++){ // ~3s
+        if(window.ZXingBrowser && window.ZXingBrowser.BrowserMultiFormatReader) return true;
+        await new Promise(r=>setTimeout(r,50));
+      }
+      return false;
+    }
+
     async function startCamera(){
+      els.debug.textContent = "";
+      if(!(await waitForZXing())){
+        log("ZXing failed to load. Check network is not blocking unpkg.com.");
+        els.status.textContent = "Scanner library didn't load (network blocked). Try another network.";
+        return;
+      }
       try{
-        els.debug.textContent = "";
-        // First, basic permission request
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio:false });
         els.video.srcObject = stream; await els.video.play();
-        els.status.textContent = "Camera ready.";
+        els.status.textContent = "Camera ready. Tap SCAN.";
         log("getUserMedia() ok");
-
-        // Now, enumerate and pick rear camera by label if available
         const devices = await ZXingBrowser.BrowserCodeReader.listVideoInputDevices();
-        log("Video inputs: " + devices.map(d=>d.label||'(no label)').join(" | "));
-        const back = devices.find(d => /back|rear|environment/i.test(d.label));
+        const back = devices.find(d=>/back|rear|environment/i.test(d.label));
         deviceId = (back || devices[0] || {}).deviceId || null;
-        if(deviceId){ log("Using deviceId: " + deviceId); }
+        log("Video inputs: " + devices.map(d=>d.label||'(no label)').join(' | '));
       }catch(e){
         log("Start camera error: " + (e && e.name ? e.name+': '+e.message : e));
-        els.status.textContent = "Camera blocked. Use HTTPS and allow camera in Chrome permissions.";
+        els.status.textContent = "Camera blocked. Use HTTPS and allow camera in browser settings.";
       }
     }
 
     async function scanOnce(){
+      if(!(await waitForZXing())){
+        els.status.textContent = "Scanner library didn't load.";
+        return;
+      }
       if(!stream){ els.status.textContent = "Start Camera first."; return; }
       els.status.textContent = "Scanning... hold steady.";
-      log("scanOnce() begin");
-
       try{
-        if(!reader){
-          reader = new ZXingBrowser.BrowserMultiFormatReader();
-          reader.hints = new Map([
-            [ZXingBrowser.ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-              ZXingBrowser.ZXing.BarcodeFormat.CODE_39,
-              ZXingBrowser.ZXing.BarcodeFormat.CODE_128,
-              ZXingBrowser.ZXing.BarcodeFormat.EAN_13,
-              ZXingBrowser.ZXing.BarcodeFormat.EAN_8,
-              ZXingBrowser.ZXing.BarcodeFormat.UPC_A,
-              ZXingBrowser.ZXing.BarcodeFormat.ITF,
-              ZXingBrowser.ZXing.BarcodeFormat.QR_CODE
-            ]],
-            [ZXingBrowser.ZXing.DecodeHintType.TRY_HARDER, true]
-          ]);
-        }
+        const reader = new ZXingBrowser.BrowserMultiFormatReader();
+        reader.hints = new Map([
+          [ZXingBrowser.ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+            ZXingBrowser.ZXing.BarcodeFormat.CODE_39,
+            ZXingBrowser.ZXing.BarcodeFormat.CODE_128,
+            ZXingBrowser.ZXing.BarcodeFormat.EAN_13,
+            ZXingBrowser.ZXing.BarcodeFormat.EAN_8,
+            ZXingBrowser.ZXing.BarcodeFormat.UPC_A,
+            ZXingBrowser.ZXing.BarcodeFormat.ITF,
+            ZXingBrowser.ZXing.BarcodeFormat.QR_CODE
+          ]],
+          [ZXingBrowser.ZXing.DecodeHintType.TRY_HARDER, true]
+        ]);
         const result = await reader.decodeOnceFromVideoDevice(deviceId || undefined, 'video');
-        if(result){
-          setScan(result.getText(), result.getBarcodeFormat());
-          els.status.textContent = "Scanned successfully.";
-          log("Decoded: " + result.getText());
-        } else {
-          els.status.textContent = "No code found. Try again.";
-          log("No result (null).");
-        }
+        if(result){ setScan(result.getText(), result.getBarcodeFormat()); els.status.textContent="Scanned."; log("Decoded: "+result.getText()); }
+        else { els.status.textContent="No code found. Try again."; log("No result."); }
       }catch(e){
-        // ZXing throws NotFoundException constantly when not found — don't spam.
-        const name = e && e.name ? e.name : (e+'').split(':')[0];
-        if(name !== 'NotFoundException'){
-          log("Decode error: " + (e && e.message ? e.name+': '+e.message : e));
-        } else {
-          log("NotFound (no code in frame).");
-        }
-        els.status.textContent = "Re-aim the barcode and press SCAN again.";
-      }
-    }
-
-    async function testFrame(){
-      try{
-        if(!stream){ els.status.textContent="Start Camera first."; return; }
-        const track = stream.getVideoTracks()[0];
-        const imageCapture = (window.ImageCapture) ? new ImageCapture(track) : null;
-        if(!imageCapture){ log("ImageCapture API not available (ok)"); els.status.textContent="Test: ImageCapture not available (normal on some phones)."; return; }
-        const bmp = await imageCapture.grabFrame();
-        log("Test: grabbed frame " + bmp.width + "x" + bmp.height);
-        els.status.textContent="Camera frame OK ("+bmp.width+"x"+bmp.height+"). Try SCAN again.";
-      }catch(e){
-        log("Test frame error: " + (e && e.message ? e.name+': '+e.message : e));
-        els.status.textContent="Test frame failed (still ok). Try SCAN again.";
+        const msg = e && e.name ? e.name+': '+e.message : (e+'');
+        log("Decode error: " + msg);
+        els.status.textContent = "Re-aim and press SCAN again.";
       }
     }
 
@@ -206,17 +183,13 @@
       catch{ window.location.href = FORMS_URL; }
     }
 
-    // Wire up
     els.btnStart.addEventListener('click', startCamera);
     els.btnScan.addEventListener('click', scanOnce);
-    els.btnTest.addEventListener('click', testFrame);
     els.btnStartUse.addEventListener('click', ()=>chooseAction('START USE'));
     els.btnFinishUsed.addEventListener('click', ()=>chooseAction('FINISH USED'));
     els.btnForm.addEventListener('click', goToForm);
     els.dtInput.addEventListener('change', updateInstruction);
     els.dtInput.addEventListener('input', updateInstruction);
-
-    try{ const prev = localStorage.getItem('lastInstruction'); if(prev){ els.instruction.value = prev; } }catch{}
   </script>
 </body>
 </html>
