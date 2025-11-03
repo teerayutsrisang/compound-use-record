@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Batch Scanner → MS Form (Android Offline)</title>
+  <title>Batch Scanner → MS Form (Editable, Same Camera Code)</title>
   <style>
     :root{
       --bg:#0b1220;--card:#0f172a;--border:#1f2a44;--text:#e5e7eb;--muted:#94a3b8;
@@ -18,7 +18,7 @@
     h1{margin:0 0 6px;font-size:22px}
     .hint{color:var(--muted);font-size:12px;margin-bottom:12px}
     .camBox{width:100%;height:1.5cm;max-height:2cm;margin:6px auto 10px;background:#000;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid #2a334d}
-    video{width:100%;height:100%;object-fit:cover}
+    video{width:100%;height:100%;object-fit:cover;transform:none}
     .btn{width:100%;padding:14px 16px;border-radius:12px;border:none;font-weight:800;font-size:16px;letter-spacing:.4px}
     .primary{background:var(--primary);color:#fff}
     .secondary{background:var(--secondary);color:#e5e7eb}
@@ -27,42 +27,30 @@
     .rowgap{height:10px}
     .label{font-size:12px;color:var(--muted);margin:8px 4px 4px}
     .resultInput{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0b1326;color:#e5e7eb;
-                 font-weight:900;font-size:32px;letter-spacing:.5px;text-align:center}
+                 font-weight:900;font-size:36px;letter-spacing:1px;text-align:center}
     .box{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0b1326;color:#e5e7eb}
     .box.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px}
     .stack{display:flex;gap:10px}
     .stack .btn{flex:1 1 0}
     .status{text-align:center;font-size:12px;color:#94a3b8;min-height:16px}
     .small{font-size:12px;color:#94a3b8}
-    .flash{margin-top:6px;text-align:center}
-    .flash button{background:#1f2937;color:#e5e7eb;border:none;padding:6px 10px;border-radius:10px;font-size:12px}
-    .debug{margin-top:8px;font-size:11px;white-space:pre-wrap;background:#0b1326;border:1px solid #1f2a44;border-radius:10px;padding:8px}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Scan Batch → Record (Android Offline)</h1>
+      <h1>Scan Batch → Record</h1>
       <div class="hint">
-        Open over <b>HTTPS</b> in <b>Chrome</b>. Allow the <b>Camera</b>. If blocked, use <b>Scan from photo</b> as fallback.
+        Works on Android & iPhone. Open over <b>HTTPS</b> and allow the <b>Camera</b>.
       </div>
 
       <div class="camBox"><video id="video" playsinline muted></video></div>
-      <div class="flash" id="flashRow" style="display:none"><button id="btnFlash">Flash: off</button></div>
 
       <div class="rowgap"></div>
-      <div class="stack">
-        <button id="btnStart" class="btn primary">Start camera</button>
-        <button id="btnScan" class="btn secondary">Start scanning</button>
-        <button id="btnRescan" class="btn secondary" style="display:none">Rescan</button>
-      </div>
+      <button id="btnStart" class="btn primary">Start Camera</button>
 
       <div class="rowgap"></div>
-      <div class="stack">
-        <input id="fileInput" type="file" accept="image/*" capture="environment" style="display:none"/>
-        <button id="btnFromPhoto" class="btn secondary">Scan from photo</button>
-        <button id="btnStop" class="btn warn">Stop camera</button>
-      </div>
+      <button id="btnScan" class="btn secondary">SCAN</button>
 
       <div class="label">Scan result (editable)</div>
       <input id="codeInput" class="resultInput" placeholder="—" />
@@ -82,40 +70,31 @@
       <div class="rowgap"></div>
       <button id="btnForm" class="btn secondary">Go to record on MS-Form</button>
 
-      <div class="status" id="status">Start camera → Start scanning. Or use “Scan from photo”.</div>
-      <div id="debug" class="debug" aria-live="polite"></div>
+      <div class="status" id="status">Start Camera → SCAN. You can edit the result, and press SCAN again to rescan.</div>
     </div>
   </div>
 
+  <!-- ZXing (same as legacy working) -->
+  <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
   <script>
     const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
     const BATCH_PARAM = "BatchID";
 
+    let stream=null, usedAction="";
     const els = {
       video: document.getElementById('video'),
       btnStart: document.getElementById('btnStart'),
       btnScan: document.getElementById('btnScan'),
-      btnRescan: document.getElementById('btnRescan'),
-      btnStop: document.getElementById('btnStop'),
-      btnFromPhoto: document.getElementById('btnFromPhoto'),
-      fileInput: document.getElementById('fileInput'),
       btnStartUse: document.getElementById('btnStartUse'),
       btnFinishUsed: document.getElementById('btnFinishUsed'),
       btnForm: document.getElementById('btnForm'),
-      btnFlash: document.getElementById('btnFlash'),
-      flashRow: document.getElementById('flashRow'),
       codeInput: document.getElementById('codeInput'),
       dtInput: document.getElementById('dtInput'),
       instruction: document.getElementById('instruction'),
-      status: document.getElementById('status'),
-      debug: document.getElementById('debug')
+      status: document.getElementById('status')
     };
-    function log(s){ els.debug.textContent += s + "\\n"; }
 
-    let stream=null, scanning=false, rafId=null, torchOn=false, usedAction="";
-
-    const detector = ('BarcodeDetector' in window) ? new BarcodeDetector({formats:['code_39','code_128','ean_13','ean_8','upc_a','itf','qr_code']}) : null;
-
+    // Time: DD/MM/YYYY HH:MM (no seconds)
     function pad(n){ return String(n).padStart(2,'0'); }
     function toDDMMYYYY_HHMM(d){ return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
     function localNowStr(){ return toDDMMYYYY_HHMM(new Date()); }
@@ -125,9 +104,11 @@
       m=s.match(/^(\\d{2})\\/(\\d{2})\\/(\\d{4})\\s+(\\d{2}):(\\d{2})(?::\\d{2})?$/); if(m) return `${m[1]}/${m[2]}/${m[3]} ${m[4]}:${m[5]}`;
       return s;
     }
-    els.dtInput.value = localNowStr();
+    function setNow(){ els.dtInput.value = localNowStr(); }
+    setNow();
 
     function currentCode(){ return (els.codeInput.value || "").trim(); }
+
     function updateInstruction(){
       const code = currentCode();
       if(!code){ els.instruction.value = ""; return; }
@@ -137,111 +118,59 @@
       els.instruction.value = `BATCH: ${code} | TIME: ${dt} | ACTION: ${act}`;
       try{ localStorage.setItem('lastInstruction', els.instruction.value); }catch{}
     }
-    els.codeInput.addEventListener('input', updateInstruction);
-    els.dtInput.addEventListener('input', updateInstruction);
-
-    function setScan(val){ els.codeInput.value = val || ""; updateInstruction();
-      try{ els.codeInput.focus(); els.codeInput.setSelectionRange(els.codeInput.value.length, els.codeInput.value.length);}catch{} }
-
-    function isSecure(){ return location.protocol === 'https:' || location.hostname === 'localhost'; }
+    function setScan(val, fmt){
+      els.codeInput.value = val || "";
+      els.status.textContent = fmt ? ("Format: "+fmt) : "";
+      updateInstruction();
+      try{ els.codeInput.focus(); els.codeInput.setSelectionRange(els.codeInput.value.length, els.codeInput.value.length); }catch{}
+    }
 
     async function startCamera(){
-      els.debug.textContent = "";
-      if(!isSecure()){ els.status.textContent = "Open this page over HTTPS."; log("Not HTTPS → camera blocked."); return; }
-      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-        els.status.textContent = "Camera API not available in this browser."; log("getUserMedia missing."); return;
-      }
-      const tries=[
-        { video:{ facingMode:{ exact:'environment' }, width:{ideal:1280}, height:{ideal:720} }, audio:false },
-        { video:{ facingMode:{ ideal:'environment' }, width:{ideal:1280}, height:{ideal:720} }, audio:false },
-        { video:true, audio:false }
-      ];
-      for(const c of tries){
-        try{
-          if(stream){ stream.getTracks().forEach(t=>t.stop()); }
-          stream = await navigator.mediaDevices.getUserMedia(c);
-          els.video.srcObject = stream; await els.video.play();
-          els.status.textContent = "Camera ready.";
-          log("getUserMedia OK: " + JSON.stringify(c));
-          const track = stream.getVideoTracks()[0];
-          const caps = track.getCapabilities ? track.getCapabilities() : {};
-          els.flashRow.style.display = (caps && 'torch' in caps) ? 'block' : 'none';
-          return;
-        }catch(e){ log("getUserMedia failed: " + (e.name?e.name+': '+e.message:e)); }
-      }
-      els.status.textContent = "Camera blocked. See messages below.";
-    }
-
-    function stopCamera(){
-      scanning=false;
-      if(rafId) cancelAnimationFrame(rafId);
-      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; }
-      els.status.textContent = "Camera stopped.";
-      torchOn=false;
-      if(els.btnFlash) els.btnFlash.textContent = "Flash: off";
-    }
-
-    async function setTorch(on){
-      if(!stream) return;
-      const track = stream.getVideoTracks()[0];
-      const caps = track.getCapabilities ? track.getCapabilities() : {};
-      if(!caps.torch) return;
-      try{ await track.applyConstraints({ advanced:[{ torch:on }] }); torchOn=on; els.btnFlash.textContent = "Flash: "+(on?"on":"off"); }catch{}
-    }
-
-    function startScan(){
-      if(!detector){ els.status.textContent = "BarcodeDetector not available. Use Chrome 94+ on Android."; log("No BarcodeDetector."); return; }
-      if(!stream){ els.status.textContent = "Start camera first."; return; }
-      if(scanning) return;
-      scanning = true;
-      els.btnScan.style.display="none"; els.btnRescan.style.display="inline-block";
-      els.status.textContent = "Scanning... hold steady over one barcode row.";
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const loop = async ()=>{
-        if(!scanning) return;
-        try{
-          // match current element box
-          const rect = els.video.getBoundingClientRect();
-          if(canvas.width!==rect.width || canvas.height!==rect.height){
-            canvas.width = rect.width; canvas.height = rect.height;
-          }
-          ctx.drawImage(els.video,0,0,canvas.width,canvas.height);
-          const bitmap = await createImageBitmap(canvas);
-          const codes = await detector.detect(bitmap);
-          if(codes && codes.length){
-            setScan(codes[0].rawValue);
-            els.status.textContent = "Scanned.";
-            scanning=false;
-            return;
-          }
-        }catch(e){ /* ignore */ }
-        rafId = requestAnimationFrame(loop);
-      };
-      rafId = requestAnimationFrame(loop);
-    }
-
-    function rescan(){
-      scanning=false; if(rafId) cancelAnimationFrame(rafId);
-      els.btnRescan.style.display="none"; els.btnScan.style.display="inline-block";
-      els.status.textContent = "Ready to scan.";
-      setScan("");
-    }
-
-    async function scanFromPhoto(file){
-      if(!file){ return; }
-      if(!detector){ els.status.textContent = "BarcodeDetector not available."; return; }
       try{
-        els.status.textContent = "Detecting from photo...";
-        const img = await createImageBitmap(file);
-        const codes = await detector.detect(img);
-        if(codes && codes.length){ setScan(codes[0].rawValue); els.status.textContent = "Scanned from photo."; }
-        else { els.status.textContent = "No code found in photo."; }
-      }catch(e){ els.status.textContent = "Photo scan failed."; }
+        // EXACT camera code copied from legacy working build:
+        let constraints = { video: { facingMode: { exact: 'environment' } }, audio:false };
+        try{
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        }catch(_){
+          constraints = { video: { facingMode: { ideal: 'environment' } }, audio:false };
+          stream = await navigator.mediaDevices.getUserMedia(constraints);
+        }
+        els.video.srcObject = stream; await els.video.play();
+        els.status.textContent = "Camera ready. Tap SCAN.";
+      }catch(e){
+        console.warn(e);
+        els.status.textContent = "Camera blocked. Use HTTPS and allow camera in browser settings.";
+      }
+    }
+    function stopCamera(){ if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; } }
+
+    async function scanOnce(){
+      if(!stream){ els.status.textContent="Start Camera first"; return; }
+      els.status.textContent = "Scanning...";
+      try{
+        const reader = new ZXingBrowser.BrowserMultiFormatReader();
+        reader.hints = new Map([
+          [ZXingBrowser.ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+            ZXingBrowser.ZXing.BarcodeFormat.CODE_39,
+            ZXingBrowser.ZXing.BarcodeFormat.CODE_128,
+            ZXingBrowser.ZXing.BarcodeFormat.EAN_13,
+            ZXingBrowser.ZXing.BarcodeFormat.EAN_8,
+            ZXingBrowser.ZXing.BarcodeFormat.UPC_A,
+            ZXingBrowser.ZXing.BarcodeFormat.ITF,
+            ZXingBrowser.ZXing.BarcodeFormat.QR_CODE
+          ]],
+          [ZXingBrowser.ZXing.DecodeHintType.TRY_HARDER, true]
+        ]);
+        const result = await reader.decodeOnceFromVideoDevice(undefined, 'video');
+        if(result){ setScan(result.getText(), result.getBarcodeFormat()); els.status.textContent="Scanned. Edit if needed, or press SCAN again to rescan."; }
+        else { els.status.textContent="No code found. Try again."; }
+      }catch(e){
+        console.warn(e);
+        els.status.textContent="Scan error. Re-aim and try again.";
+      }
     }
 
     function chooseAction(act){ usedAction = act; updateInstruction(); }
-
     async function goToForm(){
       const code = currentCode();
       if(!code){ alert("Scan (or type) a code first"); return; }
@@ -250,17 +179,13 @@
       catch{ window.location.href = FORMS_URL; }
     }
 
-    // Events
     els.btnStart.addEventListener('click', startCamera);
-    els.btnStop.addEventListener('click', stopCamera);
-    els.btnScan.addEventListener('click', startScan);
-    els.btnRescan.addEventListener('click', rescan);
-    els.btnFromPhoto.addEventListener('click', ()=> els.fileInput.click());
-    els.fileInput.addEventListener('change', (e)=> scanFromPhoto(e.target.files[0]));
-    els.btnFlash && els.btnFlash.addEventListener('click', ()=> setTorch(!torchOn));
+    els.btnScan.addEventListener('click', scanOnce);
     els.btnStartUse.addEventListener('click', ()=>chooseAction('START USE'));
     els.btnFinishUsed.addEventListener('click', ()=>chooseAction('FINISH USED'));
     els.btnForm.addEventListener('click', goToForm);
+    els.codeInput.addEventListener('input', updateInstruction);
+    els.dtInput.addEventListener('input', updateInstruction);
   </script>
 </body>
 </html>
