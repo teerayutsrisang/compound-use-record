@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Batch Scanner → MS Form (Editable, Same Camera Code)</title>
+  <title>Batch Scanner → MS Form (Legacy Working Build)</title>
   <style>
     :root{
       --bg:#0b1220;--card:#0f172a;--border:#1f2a44;--text:#e5e7eb;--muted:#94a3b8;
@@ -17,6 +17,7 @@
     .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
     h1{margin:0 0 6px;font-size:22px}
     .hint{color:var(--muted);font-size:12px;margin-bottom:12px}
+    /* Camera slit: full width, ~1.5cm tall */
     .camBox{width:100%;height:1.5cm;max-height:2cm;margin:6px auto 10px;background:#000;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid #2a334d}
     video{width:100%;height:100%;object-fit:cover;transform:none}
     .btn{width:100%;padding:14px 16px;border-radius:12px;border:none;font-weight:800;font-size:16px;letter-spacing:.4px}
@@ -26,8 +27,7 @@
     .warn{background:var(--warn);color:#000}
     .rowgap{height:10px}
     .label{font-size:12px;color:var(--muted);margin:8px 4px 4px}
-    .resultInput{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0b1326;color:#e5e7eb;
-                 font-weight:900;font-size:36px;letter-spacing:1px;text-align:center}
+    .result{text-align:center;font-weight:900;font-size:36px;letter-spacing:1px;margin:8px 0;word-break:break-all;min-height:44px}
     .box{width:100%;padding:12px;border-radius:12px;border:1px solid var(--border);background:#0b1326;color:#e5e7eb}
     .box.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:16px}
     .stack{display:flex;gap:10px}
@@ -41,7 +41,8 @@
     <div class="card">
       <h1>Scan Batch → Record</h1>
       <div class="hint">
-        Works on Android & iPhone. Open over <b>HTTPS</b> and allow the <b>Camera</b>.
+        Works on iOS & Android. Open over <b>HTTPS</b> and allow the <b>Camera</b>.
+        On iPhone, open in <b>Safari/Chrome</b> (not inside other apps).
       </div>
 
       <div class="camBox"><video id="video" playsinline muted></video></div>
@@ -52,8 +53,7 @@
       <div class="rowgap"></div>
       <button id="btnScan" class="btn secondary">SCAN</button>
 
-      <div class="label">Scan result (editable)</div>
-      <input id="codeInput" class="resultInput" placeholder="—" />
+      <div id="scanValue" class="result">—</div>
 
       <div class="label">Date &amp; time of scan (editable)</div>
       <input id="dtInput" class="box mono" />
@@ -70,17 +70,18 @@
       <div class="rowgap"></div>
       <button id="btnForm" class="btn secondary">Go to record on MS-Form</button>
 
-      <div class="status" id="status">Start Camera → SCAN. You can edit the result, and press SCAN again to rescan.</div>
+      <div class="status" id="status">Start Camera → SCAN (press SCAN again to rescan).</div>
+      <div class="small" style="margin-top:8px;">Tip: After opening the form, long-press the first field and Paste.</div>
     </div>
   </div>
 
-  <!-- ZXing (same as legacy working) -->
+  <!-- ZXing (legacy working path) -->
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
   <script>
     const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
     const BATCH_PARAM = "BatchID";
 
-    let stream=null, usedAction="";
+    let stream=null, lastCode="", usedAction="";
     const els = {
       video: document.getElementById('video'),
       btnStart: document.getElementById('btnStart'),
@@ -88,7 +89,7 @@
       btnStartUse: document.getElementById('btnStartUse'),
       btnFinishUsed: document.getElementById('btnFinishUsed'),
       btnForm: document.getElementById('btnForm'),
-      codeInput: document.getElementById('codeInput'),
+      scanValue: document.getElementById('scanValue'),
       dtInput: document.getElementById('dtInput'),
       instruction: document.getElementById('instruction'),
       status: document.getElementById('status')
@@ -107,27 +108,24 @@
     function setNow(){ els.dtInput.value = localNowStr(); }
     setNow();
 
-    function currentCode(){ return (els.codeInput.value || "").trim(); }
-
     function updateInstruction(){
-      const code = currentCode();
-      if(!code){ els.instruction.value = ""; return; }
+      if(!lastCode){ els.instruction.value = ""; return; }
       els.dtInput.value = sanitizeTimeStr(els.dtInput.value);
       const dt = els.dtInput.value || localNowStr();
       const act = usedAction || "(select START/FINISH)";
-      els.instruction.value = `BATCH: ${code} | TIME: ${dt} | ACTION: ${act}`;
+      els.instruction.value = `BATCH: ${lastCode} | TIME: ${dt} | ACTION: ${act}`;
       try{ localStorage.setItem('lastInstruction', els.instruction.value); }catch{}
     }
     function setScan(val, fmt){
-      els.codeInput.value = val || "";
+      lastCode = val || "";
+      els.scanValue.textContent = lastCode || "—";
       els.status.textContent = fmt ? ("Format: "+fmt) : "";
       updateInstruction();
-      try{ els.codeInput.focus(); els.codeInput.setSelectionRange(els.codeInput.value.length, els.codeInput.value.length); }catch{}
     }
 
     async function startCamera(){
       try{
-        // EXACT camera code copied from legacy working build:
+        // exact → ideal rear camera
         let constraints = { video: { facingMode: { exact: 'environment' } }, audio:false };
         try{
           stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -162,7 +160,7 @@
           [ZXingBrowser.ZXing.DecodeHintType.TRY_HARDER, true]
         ]);
         const result = await reader.decodeOnceFromVideoDevice(undefined, 'video');
-        if(result){ setScan(result.getText(), result.getBarcodeFormat()); els.status.textContent="Scanned. Edit if needed, or press SCAN again to rescan."; }
+        if(result){ setScan(result.getText(), result.getBarcodeFormat()); els.status.textContent="Scanned. Press SCAN again to rescan."; }
         else { els.status.textContent="No code found. Try again."; }
       }catch(e){
         console.warn(e);
@@ -172,10 +170,9 @@
 
     function chooseAction(act){ usedAction = act; updateInstruction(); }
     async function goToForm(){
-      const code = currentCode();
-      if(!code){ alert("Scan (or type) a code first"); return; }
+      if(!lastCode){ alert("Scan a barcode first"); return; }
       try{ await navigator.clipboard.writeText(els.instruction.value); localStorage.setItem('lastInstruction', els.instruction.value); }catch{}
-      try{ const u=new URL(FORMS_URL); u.searchParams.set(BATCH_PARAM,code); window.location.href=u.toString(); }
+      try{ const u=new URL(FORMS_URL); u.searchParams.set(BATCH_PARAM,lastCode); window.location.href=u.toString(); }
       catch{ window.location.href = FORMS_URL; }
     }
 
@@ -184,8 +181,6 @@
     els.btnStartUse.addEventListener('click', ()=>chooseAction('START USE'));
     els.btnFinishUsed.addEventListener('click', ()=>chooseAction('FINISH USED'));
     els.btnForm.addEventListener('click', goToForm);
-    els.codeInput.addEventListener('input', updateInstruction);
-    els.dtInput.addEventListener('input', updateInstruction);
   </script>
 </body>
 </html>
