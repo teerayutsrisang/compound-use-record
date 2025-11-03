@@ -63,16 +63,29 @@
             font-size: 24px;
             text-align: center;
             box-sizing: border-box;
+            /* NEW: Make date/time inputs look good */
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI";
+            font-size: 1.2em; /* Make date/time smaller */
         }
         
         #batch-id {
             flex-grow: 1;
             width: 70%;
+            font-size: 24px; /* Keep batch ID big */
         }
         
         #manual-code {
             width: 80px; 
             flex-shrink: 0;
+            font-size: 24px; /* Keep manual code big */
+        }
+        
+        /* --- NEW: Style for Date/Time inputs --- */
+        #manual-date {
+            width: 60%;
+        }
+        #manual-time {
+            width: 40%;
         }
         
         .button-grid { 
@@ -93,7 +106,6 @@
         #btn-start { background-color: #28a745; }
         #btn-finish { background-color: #dc3545; }
         
-        /* Styles for the 3-line, bold text box */
         #instruction {
             width: 100%;
             box-sizing: border-box;
@@ -143,6 +155,12 @@
             <button id="btn-finish" class="action-btn">2. FINISH USED</button>
         </div>
         
+        <div class="label">Adjust Date & Time (if needed):</div>
+        <div class="input-row">
+            <input type="date" id="manual-date" class="resultInput">
+            <input type="time" id="manual-time" class="resultInput">
+        </div>
+        
         <div class="label">Data to Record:</div>
         <textarea id="instruction" readonly>Scan a code and select an action...</textarea>
 
@@ -160,6 +178,11 @@
         const manualCodeInput = document.getElementById('manual-code');
         const startBtn = document.getElementById('btn-start');
         const finishBtn = document.getElementById('btn-finish');
+        
+        // --- NEW: Get the Date/Time inputs ---
+        const manualDateInput = document.getElementById('manual-date');
+        const manualTimeInput = document.getElementById('manual-time');
+        
         const instructionText = document.getElementById('instruction');
         const formBtn = document.getElementById('btn-form');
         const statusDiv = document.getElementById('status');
@@ -167,6 +190,20 @@
         let lastAction = "";
         
         const html5QrCode = new Html5Qrcode("qr-reader");
+
+        // --- Helper function to format date for <input type="date"> ---
+        function getISODate(date) {
+            return date.getFullYear() + '-' + 
+                   ('0' + (date.getMonth() + 1)).slice(-2) + '-' + 
+                   ('0' + date.getDate()).slice(-2);
+        }
+        
+        // --- Helper function to format time for <input type="time"> ---
+        function getISOTime(date) {
+            return ('0' + date.getHours()).slice(-2) + ':' + 
+                   ('0' + date.getMinutes()).slice(-2);
+        }
+
 
         scanBtn.addEventListener('click', () => {
             qrReaderDiv.style.display = 'block';
@@ -201,18 +238,32 @@
             // ignore
         }
 
+        // --- UPDATED: Button click listeners ---
         startBtn.addEventListener('click', () => {
             lastAction = 'START';
+            // Auto-fill the current date and time
+            const now = new Date();
+            manualDateInput.value = getISODate(now);
+            manualTimeInput.value = getISOTime(now);
             updateInstruction();
         });
         
         finishBtn.addEventListener('click', () => {
             lastAction = 'FINISHED'; 
+            // Auto-fill the current date and time
+            const now = new Date();
+            manualDateInput.value = getISODate(now);
+            manualTimeInput.value = getISOTime(now);
             updateInstruction();
         });
         
         batchIdInput.addEventListener('input', updateInstruction);
         manualCodeInput.addEventListener('input', updateInstruction);
+        
+        // --- NEW: Listen for changes to date/time inputs ---
+        manualDateInput.addEventListener('input', updateInstruction);
+        manualTimeInput.addEventListener('input', updateInstruction);
+        
 
         
         // --- THIS IS THE UPDATED FUNCTION ---
@@ -220,6 +271,10 @@
             const batchId = batchIdInput.value;
             const manualCode = manualCodeInput.value;
             
+            // --- NEW: Get date and time from the inputs ---
+            const dateValue = manualDateInput.value; // Format: YYYY-MM-DD
+            const timeValue = manualTimeInput.value; // Format: HH:MM
+
             if (!batchId) {
                 instructionText.value = '1. Scan a code...';
                 formBtn.disabled = true;
@@ -237,37 +292,30 @@
                 formBtn.disabled = true;
                 return;
             }
+
+            // --- NEW: Check if date/time are filled ---
+            if (!dateValue || !timeValue) {
+                instructionText.value = `Data: ${batchId} ${manualCode}. \nAction: ${lastAction}. \n4. Date/Time is loading...`;
+                formBtn.disabled = true;
+                return;
+            }
             
-            const now = new Date();
+            // --- NEW: Format date from YYYY-MM-DD to DD/MM/YYYY ---
+            const dateParts = dateValue.split('-');
+            const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
             
-            // Get Date Part: DD/MM/YYYY
-            const dateString = now.toLocaleDateString('en-GB', { 
-                day: '2-digit', 
-                month: '2-digit', 
-                year: 'numeric' 
-            });
+            // Time value is already in HH:MM format
             
-            // --- TIME IS ADDED BACK ---
-            // Get Time Part: HH:MM (e.g., 22:06)
-            const timeString = now.toLocaleTimeString('en-GB', { 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                hour12: false 
-            });
-            
-            // --- NEW: Create the final 3-line text string with time ---
-            // \n creates a new line in a textarea
-            instructionText.value = `${batchId} ${manualCode},\n${lastAction},\n${dateString} ${timeString}`;
+            // --- NEW: Create the final 3-line text string ---
+            instructionText.value = `${batchId} ${manualCode},\n${lastAction},\n${formattedDate} ${timeValue}`;
             formBtn.disabled = false;
         }
 
         
         formBtn.addEventListener('click', () => {
-            const batchId = batchIdInput.value;
-            const manualCode = manualCodeInput.value;
-            
-            if (!batchId || !manualCode || !lastAction) {
-                alert("Please scan, enter 3-digit code, and select START or FINISH.");
+            // Check all 4 pieces of data
+            if (!batchIdInput.value || !manualCodeInput.value || !lastAction || !manualDateInput.value || !manualTimeInput.value) {
+                alert("Please fill in all fields: Scan, Code, Action, and Date/Time.");
                 return;
             }
 
