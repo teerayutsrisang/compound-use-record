@@ -47,8 +47,14 @@
             color: #6c757d;
             margin: 15px 0 5px 0;
         }
+        
+        /* --- NEW: CSS for the two input boxes --- */
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+        
         .resultInput {
-            width: 100%;
             padding: 12px;
             border-radius: 12px;
             border: 1px solid #ccc;
@@ -59,6 +65,18 @@
             text-align: center;
             box-sizing: border-box;
         }
+        
+        #batch-id {
+            flex-grow: 1; /* Takes up most of the space */
+            width: 70%;
+        }
+        
+        #manual-code {
+            width: 80px; /* Small box for 3 digits */
+            flex-shrink: 0;
+        }
+        /* --- End of NEW CSS --- */
+
         
         .button-grid { 
             display: grid; 
@@ -115,9 +133,11 @@
         
         <div id="qr-reader"></div>
 
-        <div class="label">Batch ID:</div>
-        <input id="batch-id" class="resultInput" placeholder="Scan or type ID...">
-
+        <div class="label">Batch ID & Manual Code:</div>
+        <div class="input-row">
+            <input id="batch-id" class="resultInput" placeholder="Scan Batch ID...">
+            <input id="manual-code" class="resultInput" placeholder="000" maxlength="3">
+        </div>
         <div class="button-grid">
             <button id="btn-start" class="action-btn">2. START USE</button>
             <button id="btn-finish" class="action-btn">2. FINISH USED</button>
@@ -134,12 +154,13 @@
     <script>
         const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
         
-        // --- We no longer need the Question ID ---
-        // const BATCH_PARAM_NAME = "r64dd8a4e83d44a31b54a97344fe84d3a"; 
-        
         const scanBtn = document.getElementById('scan-btn');
         const qrReaderDiv = document.getElementById('qr-reader');
         const batchIdInput = document.getElementById('batch-id');
+        
+        // --- NEW: Get the manual code box ---
+        const manualCodeInput = document.getElementById('manual-code');
+        
         const startBtn = document.getElementById('btn-start');
         const finishBtn = document.getElementById('btn-finish');
         const instructionText = document.getElementById('instruction');
@@ -173,9 +194,13 @@
             html5QrCode.stop().catch(err => console.warn("Scanner stop failed."));
             qrReaderDiv.style.display = 'none';
             
+            // This only fills the *first* box
             batchIdInput.value = decodedText;
             statusDiv.textContent = `Scan Successful: ${decodedText}`;
             updateInstruction();
+            
+            // --- NEW: Automatically focus the manual box ---
+            manualCodeInput.focus();
         }
 
         function onScanFailure(error) {
@@ -193,18 +218,30 @@
         });
         
         batchIdInput.addEventListener('input', updateInstruction);
+        // --- NEW: Listen for changes to the manual box ---
+        manualCodeInput.addEventListener('input', updateInstruction);
 
         
+        // --- THIS IS THE UPDATED FUNCTION ---
         function updateInstruction() {
             const batchId = batchIdInput.value;
+            const manualCode = manualCodeInput.value; // Get the new manual code
+            
             if (!batchId) {
-                instructionText.value = 'Scan a code and select an action...';
+                instructionText.value = '1. Scan a code...';
+                formBtn.disabled = true;
+                return;
+            }
+            
+            // --- NEW: Check for manual code ---
+            if (!manualCode) {
+                instructionText.value = `Scanned: ${batchId}. \n2. Enter 3-digit code.`;
                 formBtn.disabled = true;
                 return;
             }
             
             if (!lastAction) {
-                instructionText.value = `Scanned: ${batchId}. Now select START or FINISH.`;
+                instructionText.value = `Data: ${batchId} ${manualCode}. \n3. Select START or FINISH.`;
                 formBtn.disabled = true;
                 return;
             }
@@ -223,41 +260,38 @@
                 hour12: false 
             });
             
-            instructionText.value = `${batchId}, ${lastAction}, ${dateString} ${timeString}`;
+            // --- NEW: Create the final text string ---
+            instructionText.value = `${batchId} ${manualCode}, ${lastAction}, ${dateString} ${timeString}`;
             formBtn.disabled = false;
         }
 
         
-        // --- THIS IS THE NEW "COPY-TO-CLIPBOARD" FUNCTION ---
+        // --- THIS FUNCTION IS UPDATED ---
         formBtn.addEventListener('click', () => {
             const batchId = batchIdInput.value;
+            const manualCode = manualCodeInput.value; // Get the new manual code
             
-            if (!batchId || !lastAction) {
-                alert("Please scan a code and select START or FINISH.");
+            // --- NEW: Check all 3 pieces of data ---
+            if (!batchId || !manualCode || !lastAction) {
+                alert("Please scan, enter 3-digit code, and select START or FINISH.");
                 return;
             }
 
-            // Get the data string we want to copy
             const dataToCopy = instructionText.value;
 
-            // --- NEW FEATURE: Copy to Clipboard ---
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(dataToCopy)
                     .then(() => {
-                        // Success! Now open the form.
                         statusDiv.textContent = "Data copied! Opening form...";
-                        // Open the form (using the clean URL)
                         window.location.href = FORMS_URL; 
                     })
                     .catch(err => {
-                        // Failed to copy
                         console.error("Failed to copy text: ", err);
-                        alert("Failed to copy data. Opening form. Please paste manually.");
-                        window.location.href = FORMS_URL; // Still open the form
+                        alert("Failed to copy data. Opening form.");
+                        window.location.href = FORMS_URL;
                     });
             } else {
-                // Fallback for older/insecure browsers
-                alert("Clipboard API not available. Opening form. Please copy the text manually.");
+                alert("Clipboard API not available. Opening form.");
                 window.location.href = FORMS_URL;
             }
         });
