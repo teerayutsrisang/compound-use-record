@@ -48,7 +48,6 @@
             margin: 15px 0 5px 0;
         }
         
-        /* --- NEW: CSS for the two input boxes --- */
         .input-row {
             display: flex;
             gap: 10px;
@@ -67,16 +66,14 @@
         }
         
         #batch-id {
-            flex-grow: 1; /* Takes up most of the space */
+            flex-grow: 1;
             width: 70%;
         }
         
         #manual-code {
-            width: 80px; /* Small box for 3 digits */
+            width: 80px; 
             flex-shrink: 0;
         }
-        /* --- End of NEW CSS --- */
-
         
         .button-grid { 
             display: grid; 
@@ -96,6 +93,7 @@
         #btn-start { background-color: #28a745; }
         #btn-finish { background-color: #dc3545; }
         
+        /* Styles for the 3-line, bold text box */
         #instruction {
             width: 100%;
             box-sizing: border-box;
@@ -103,9 +101,10 @@
             border-radius: 8px;
             border: 1px solid #ccc;
             font-family: monospace;
-            font-size: 14px;
             background: #f4f4f9;
-            min-height: 80px;
+            font-size: 1.5em; 
+            font-weight: bold;
+            min-height: 120px;
         }
         
         #btn-form {
@@ -138,6 +137,7 @@
             <input id="batch-id" class="resultInput" placeholder="Scan Batch ID...">
             <input id="manual-code" class="resultInput" placeholder="000" maxlength="3">
         </div>
+
         <div class="button-grid">
             <button id="btn-start" class="action-btn">2. START USE</button>
             <button id="btn-finish" class="action-btn">2. FINISH USED</button>
@@ -157,10 +157,7 @@
         const scanBtn = document.getElementById('scan-btn');
         const qrReaderDiv = document.getElementById('qr-reader');
         const batchIdInput = document.getElementById('batch-id');
-        
-        // --- NEW: Get the manual code box ---
         const manualCodeInput = document.getElementById('manual-code');
-        
         const startBtn = document.getElementById('btn-start');
         const finishBtn = document.getElementById('btn-finish');
         const instructionText = document.getElementById('instruction');
@@ -194,12 +191,9 @@
             html5QrCode.stop().catch(err => console.warn("Scanner stop failed."));
             qrReaderDiv.style.display = 'none';
             
-            // This only fills the *first* box
             batchIdInput.value = decodedText;
             statusDiv.textContent = `Scan Successful: ${decodedText}`;
             updateInstruction();
-            
-            // --- NEW: Automatically focus the manual box ---
             manualCodeInput.focus();
         }
 
@@ -218,14 +212,13 @@
         });
         
         batchIdInput.addEventListener('input', updateInstruction);
-        // --- NEW: Listen for changes to the manual box ---
         manualCodeInput.addEventListener('input', updateInstruction);
 
         
         // --- THIS IS THE UPDATED FUNCTION ---
         function updateInstruction() {
             const batchId = batchIdInput.value;
-            const manualCode = manualCodeInput.value; // Get the new manual code
+            const manualCode = manualCodeInput.value;
             
             if (!batchId) {
                 instructionText.value = '1. Scan a code...';
@@ -233,7 +226,6 @@
                 return;
             }
             
-            // --- NEW: Check for manual code ---
             if (!manualCode) {
                 instructionText.value = `Scanned: ${batchId}. \n2. Enter 3-digit code.`;
                 formBtn.disabled = true;
@@ -248,30 +240,32 @@
             
             const now = new Date();
             
+            // Get Date Part: DD/MM/YYYY
             const dateString = now.toLocaleDateString('en-GB', { 
                 day: '2-digit', 
                 month: '2-digit', 
                 year: 'numeric' 
             });
             
+            // --- TIME IS ADDED BACK ---
+            // Get Time Part: HH:MM (e.g., 22:06)
             const timeString = now.toLocaleTimeString('en-GB', { 
                 hour: '2-digit', 
                 minute: '2-digit', 
                 hour12: false 
             });
             
-            // --- NEW: Create the final text string ---
-            instructionText.value = `${batchId} ${manualCode}, ${lastAction}, ${dateString} ${timeString}`;
+            // --- NEW: Create the final 3-line text string with time ---
+            // \n creates a new line in a textarea
+            instructionText.value = `${batchId} ${manualCode},\n${lastAction},\n${dateString} ${timeString}`;
             formBtn.disabled = false;
         }
 
         
-        // --- THIS FUNCTION IS UPDATED ---
         formBtn.addEventListener('click', () => {
             const batchId = batchIdInput.value;
-            const manualCode = manualCodeInput.value; // Get the new manual code
+            const manualCode = manualCodeInput.value;
             
-            // --- NEW: Check all 3 pieces of data ---
             if (!batchId || !manualCode || !lastAction) {
                 alert("Please scan, enter 3-digit code, and select START or FINISH.");
                 return;
