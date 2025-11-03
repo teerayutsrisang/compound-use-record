@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Batch Scanner (to MS Form)</title>
-    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
@@ -23,13 +23,11 @@
         }
         h1 { text-align: center; margin-top: 0; }
         
-        /* This is the box where the camera will appear */
         #qr-reader {
             width: 100%;
             border: 1px solid #ccc;
             border-radius: 8px;
             margin-top: 15px;
-            /* It is hidden until you press "Scan" */
             display: none; 
         }
 
@@ -59,7 +57,7 @@
             font-weight: bold;
             font-size: 24px;
             text-align: center;
-            box-sizing: border-box; /* Important fix */
+            box-sizing: border-box;
         }
         
         .button-grid { 
@@ -134,14 +132,12 @@
     </div>
 
     <script>
-        // --- This is the same MS Form URL from your file ---
         const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
         
-        // This is the "question name" in your form to pre-fill
-        // Check your form to make sure this is correct. I am guessing it is 'BatchID'.
-        const BATCH_PARAM_NAME = "r"_YOUR_QUESTION_ID_HERE"; // IMPORTANT: See note below
+        // --- !!! IMPORTANT !!! ---
+        // You MUST find the correct ID for your form's question.
+        const BATCH_PARAM_NAME = "r_YOUR_QUESTION_ID_HERE"; 
         
-        // Get all the buttons and fields
         const scanBtn = document.getElementById('scan-btn');
         const qrReaderDiv = document.getElementById('qr-reader');
         const batchIdInput = document.getElementById('batch-id');
@@ -153,43 +149,39 @@
         
         let lastAction = "";
         
-        // Initialize the scanner
+        // This is the scanner object
         const html5QrCode = new Html5Qrcode("qr-reader");
 
-        // --- Scan Button Logic ---
         scanBtn.addEventListener('click', () => {
             qrReaderDiv.style.display = 'block';
             statusDiv.textContent = 'Starting camera...';
             
             html5QrCode.start(
-                { facingMode: "environment" }, // Use back camera
+                { facingMode: "environment" }, 
                 { 
                     fps: 10, 
                     qrbox: { width: 250, height: 250 } 
                 },
-                onScanSuccess,  // This function is called on success
-                onScanFailure   // This is called on failure
+                onScanSuccess,
+                onScanFailure
             ).catch(err => {
                 statusDiv.textContent = 'Error: Cannot start camera. Check permissions.';
             });
         });
 
         function onScanSuccess(decodedText, decodedResult) {
-            // Stop the camera
             html5QrCode.stop().catch(err => console.warn("Scanner stop failed."));
             qrReaderDiv.style.display = 'none';
             
-            // Put the result in the box
             batchIdInput.value = decodedText;
             statusDiv.textContent = `Scan Successful: ${decodedText}`;
             updateInstruction();
         }
 
         function onScanFailure(error) {
-            // This just ignores scans that don't work
+            // ignore
         }
 
-        // --- Action Button Logic ---
         startBtn.addEventListener('click', () => {
             lastAction = 'START';
             updateInstruction();
@@ -200,7 +192,7 @@
             updateInstruction();
         });
         
-        batchIdInput.addEventListener('input', updateInstruction); // Also update if they type
+        batchIdInput.addEventListener('input', updateInstruction);
 
         function updateInstruction() {
             const batchId = batchIdInput.value;
@@ -216,15 +208,13 @@
                 return;
             }
             
-            // Get current time
             const now = new Date();
             const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
             
             instructionText.value = `BATCH: ${batchId} | ACTION: ${lastAction} | TIME: ${time}`;
-            formBtn.disabled = false; // Enable the "Go to Form" button
+            formBtn.disabled = false;
         }
 
-        // --- Go to Form Button Logic ---
         formBtn.addEventListener('click', () => {
             const batchId = batchIdInput.value;
             
@@ -233,13 +223,11 @@
                 return;
             }
 
-            // This is the new, better way to pre-fill a form
             const url = new URL(FORMS_URL);
             
-            // This pre-fills the form with a JSON object.
             // This is the official way to pre-fill multiple fields.
             const prefillData = {
-                [BATCH_PARAM_NAME]: instructionText.value // Pass the full instruction string
+                [BATCH_PARAM_NAME]: instructionText.value
             };
             
             url.searchParams.set('data', JSON.stringify(prefillData));
