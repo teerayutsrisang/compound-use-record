@@ -1,10 +1,11 @@
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <title>Batch Scanner → MS Form (Universal)</title>
+  <title>Batch Scanner → MS Form (Universal, Simplified)</title>
   <style>
     :root{
       --bg:#0b1220;--card:#0f172a;--border:#1f2a44;--text:#e5e7eb;--muted:#94a3b8;
@@ -16,11 +17,8 @@
     .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
     h1{margin:0 0 6px;font-size:22px}
     .hint{color:var(--muted);font-size:12px;margin-bottom:12px}
-
-    /* Camera: full width, ~1.5cm tall (approx on phones) */
     .camBox{width:100%;height:1.5cm;max-height:2cm;margin:6px auto 10px;background:#000;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid #2a334d}
-    video{width:100%;height:100%;object-fit:cover;transform:none} /* not mirrored */
-
+    video{width:100%;height:100%;object-fit:cover;transform:none}
     .btn{width:100%;padding:14px 16px;border-radius:12px;border:none;font-weight:800;font-size:16px;letter-spacing:.4px}
     .primary{background:var(--primary);color:#fff}
     .secondary{background:var(--secondary);color:#e5e7eb}
@@ -45,8 +43,8 @@
     <div class="card">
       <h1>Scan Batch → Record</h1>
       <div class="hint">
-        Works on iOS & Android. Open over <b>HTTPS</b> and allow the <b>Camera</b>.
-        On iPhone, open in <b>Safari or Chrome</b> (not inside other apps).
+        Works on iOS & Android. Use <b>HTTPS</b> and allow <b>Camera</b>.<br/>
+        If opened inside other apps (LINE/FB/Teams), long‑press the link → <b>Open in Safari/Chrome</b>.
       </div>
 
       <div class="camBox"><video id="video" playsinline muted></video></div>
@@ -76,17 +74,14 @@
       <button id="btnForm" class="btn secondary">Go to record on MS-Form</button>
 
       <div class="status" id="status">Start Camera → SCAN (you can rescan any time).</div>
-      <div class="small" style="margin-top:8px;">Tip: After opening the form, long-press the first field and Paste.</div>
+      <div class="small" style="margin-top:8px;">Tip: After opening the form, long‑press the first field and Paste.</div>
     </div>
   </div>
 
-  <!-- ZXing scanner (universal) -->
   <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.5/umd/index.min.js"></script>
   <script>
-    /* >>> Your Microsoft Form URL is set here <<< */
     const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
     const BATCH_PARAM = "BatchID";
-
     const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const IS_ANDROID = /Android/.test(navigator.userAgent);
 
@@ -109,11 +104,8 @@
 
     function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),1800); }
 
-    // ---- Time helpers: DD/MM/YYYY HH:MM (no seconds) ----
-    function toDDMMYYYY_HHMM(d){
-      const pad = n => String(n).padStart(2,'0');
-      return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    }
+    // Time: DD/MM/YYYY HH:MM (no seconds)
+    function toDDMMYYYY_HHMM(d){ const pad = n => String(n).padStart(2,'0'); return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
     function localNowStr(){ return toDDMMYYYY_HHMM(new Date()); }
     function sanitizeTimeStr(s){
       if(!s) return "";
@@ -124,7 +116,6 @@
     function setNow(){ els.dtInput.value = localNowStr(); }
     setNow();
 
-    // ---- Instruction text builder ----
     function updateInstruction(){
       if(!lastCode){ els.instruction.value = ""; return; }
       els.dtInput.value = sanitizeTimeStr(els.dtInput.value);
@@ -133,38 +124,24 @@
       els.instruction.value = `BATCH: ${lastCode} | TIME: ${dt} | ACTION: ${act}`;
       try{ localStorage.setItem('lastInstruction', els.instruction.value); }catch{}
     }
-    function setScan(val, fmt){
-      lastCode = val || "";
-      els.scanValue.textContent = lastCode || "—";
-      els.status.textContent = fmt ? ("Format: "+fmt) : "";
-      updateInstruction();
-    }
+    function setScan(val, fmt){ lastCode = val || ""; els.scanValue.textContent = lastCode || "—"; els.status.textContent = fmt ? ("Format: "+fmt) : ""; updateInstruction(); }
 
-    // ---- Camera / Flash ----
     async function startCamera(){
       try{
         stopCamera();
         // Try strict rear camera, then relax
-        let constraints = { video: { facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false };
-        try{
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-        }catch(_){
-          constraints = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false };
-          stream = await navigator.mediaDevices.getUserMedia(constraints);
-        }
+        let constraints = { video: { facingMode: { exact: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false };
+        try{ stream = await navigator.mediaDevices.getUserMedia(constraints); }
+        catch(_){ constraints = { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }; stream = await navigator.mediaDevices.getUserMedia(constraints); }
         els.video.srcObject = stream; await els.video.play();
         els.video.style.transform = "none";
         els.status.textContent = "Camera ready. Tap SCAN to capture.";
 
-        // Flash/torch: available on many Android browsers, not on iOS Safari/Chrome
+        // Flash on Android if supported
         if (IS_ANDROID) {
           const track = stream.getVideoTracks()[0];
           const caps = track.getCapabilities ? track.getCapabilities() : {};
-          if (caps && 'torch' in caps) {
-            els.flashRow.style.display = 'block';
-          } else {
-            els.flashRow.style.display = 'none';
-          }
+          els.flashRow.style.display = (caps && 'torch' in caps) ? 'block' : 'none';
         } else {
           els.flashRow.style.display = 'none';
         }
@@ -173,40 +150,22 @@
         els.status.textContent = "Camera blocked. Use HTTPS and allow camera in browser settings.";
       }
     }
-
-    function stopCamera(){
-      if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; torchOn=false; updateFlashLabel(false,true); }
-    }
-
+    function stopCamera(){ if(stream){ stream.getTracks().forEach(t=>t.stop()); stream=null; torchOn=false; updateFlashLabel(false,true); } }
     async function setTorch(on){
       if(!stream) return false;
       const track = stream.getVideoTracks()[0];
-      if(!track) return false;
       const caps = track.getCapabilities ? track.getCapabilities() : {};
       if(!caps.torch) { updateFlashLabel(false); return false; }
-      try{
-        await track.applyConstraints({ advanced: [{ torch: on }] });
-        torchOn = on; updateFlashLabel(true);
-        return true;
-      }catch(e){
-        console.warn("Torch apply failed", e);
-        updateFlashLabel(false);
-        return false;
-      }
+      try{ await track.applyConstraints({ advanced: [{ torch: on }] }); torchOn = on; updateFlashLabel(true); return true; }
+      catch(e){ console.warn("Torch apply failed", e); updateFlashLabel(false); return false; }
     }
-    function updateFlashLabel(supported,reset){
-      if(reset){ els.btnFlash.textContent = "Flash: off"; return; }
-      if(!supported){ els.btnFlash.textContent = "Flash: n/a"; return; }
-      els.btnFlash.textContent = "Flash: " + (torchOn ? "on" : "off");
-    }
+    function updateFlashLabel(supported, reset){ if(reset){ els.btnFlash.textContent="Flash: off"; return; } if(!supported){ els.btnFlash.textContent="Flash: n/a"; return; } els.btnFlash.textContent="Flash: " + (torchOn ? "on" : "off"); }
 
-    // ---- Scan (one-shot with ZXing). Tap again to rescan ----
     async function scanOnce(){
       if(!stream){ toast("Start Camera first"); return; }
       els.status.textContent = "Scanning...";
       try{
         const reader = new ZXingBrowser.BrowserMultiFormatReader();
-        // Hints: focus on common formats incl. Code 39; try harder for low-contrast prints
         reader.hints = new Map([
           [ZXingBrowser.ZXing.DecodeHintType.POSSIBLE_FORMATS, [
             ZXingBrowser.ZXing.BarcodeFormat.CODE_39,
@@ -229,7 +188,6 @@
     }
 
     function chooseAction(act){ usedAction = act; updateInstruction(); toast(act); }
-
     async function goToForm(){
       if(!lastCode){ toast("Scan a barcode first"); return; }
       try{ await navigator.clipboard.writeText(els.instruction.value); localStorage.setItem('lastInstruction', els.instruction.value); }catch{}
@@ -237,27 +195,18 @@
       catch{ window.location.href = FORMS_URL; }
     }
 
-    // Wire up
+    // Events
     els.btnStart.addEventListener('click', startCamera);
     els.btnScan.addEventListener('click', scanOnce);
     els.btnStartUse.addEventListener('click', ()=>chooseAction('START USE'));
     els.btnFinishUsed.addEventListener('click', ()=>chooseAction('FINISH USED'));
     els.btnForm.addEventListener('click', goToForm);
-    els.btnFlash && els.btnFlash.addEventListener('click', async ()=>{
-      if(!stream){ toast("Start Camera first"); return; }
-      await setTorch(!torchOn);
-    });
+    els.btnFlash && els.btnFlash.addEventListener('click', async ()=>{ if(!stream){ toast("Start Camera first"); return; } await setTorch(!torchOn); });
     els.dtInput.addEventListener('change', updateInstruction);
     els.dtInput.addEventListener('input', updateInstruction);
 
     // Restore last instruction if any
     try{ const prev = localStorage.getItem('lastInstruction'); if(prev){ els.instruction.value = prev; } }catch{}
-
-    // Optional: keep screen awake where supported
-    if(navigator.wakeLock && navigator.wakeLock.request){
-      let lock=null; const lockIt=async()=>{try{lock=await navigator.wakeLock.request('screen');}catch{}};
-      lockIt(); document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') lockIt(); });
-    }
   </script>
 </body>
 </html>
