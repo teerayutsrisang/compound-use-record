@@ -6,6 +6,7 @@
     <title>Batch Scanner (to MS Form)</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
+        /* All the CSS styles are exactly the same as before */
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             margin: 0; 
@@ -22,7 +23,6 @@
             padding: 20px; 
         }
         h1 { text-align: center; margin-top: 0; }
-        
         #qr-reader {
             width: 100%;
             border: 1px solid #ccc;
@@ -30,7 +30,6 @@
             margin-top: 15px;
             display: none; 
         }
-
         #scan-btn {
             width: 100%;
             font-size: 1.5em;
@@ -41,7 +40,6 @@
             border-radius: 8px;
             cursor: pointer;
         }
-        
         .label {
             font-size: 12px;
             color: #6c757d;
@@ -59,7 +57,6 @@
             text-align: center;
             box-sizing: border-box;
         }
-        
         .button-grid { 
             display: grid; 
             grid-template-columns: 1fr 1fr; 
@@ -74,10 +71,8 @@
             cursor: pointer;
             color: white;
         }
-        
         #btn-start { background-color: #28a745; }
         #btn-finish { background-color: #dc3545; }
-        
         #instruction {
             width: 100%;
             box-sizing: border-box;
@@ -89,13 +84,11 @@
             background: #f4f4f9;
             min-height: 80px;
         }
-        
         #btn-form {
             width: 100%;
             margin-top: 15px;
             background: #6c757d;
         }
-        
         #status { 
             margin-top: 15px; 
             font-weight: bold; 
@@ -134,7 +127,6 @@
     <script>
         const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
         
-        // This is your correct Question ID
         const BATCH_PARAM_NAME = "r64dd8a4e83d44a31b54a97344fe84d3a"; 
         
         const scanBtn = document.getElementById('scan-btn');
@@ -148,23 +140,27 @@
         
         let lastAction = "";
         
-        const html5QrCode = new Html5QrCode("qr-reader");
+        const html5QrCode = new Html5Qrcode("qr-reader");
 
+        // --- THIS FUNCTION IS NOW UPDATED ---
         scanBtn.addEventListener('click', () => {
             qrReaderDiv.style.display = 'block';
             statusDiv.textContent = 'Starting camera...';
             
-            html5QrCode.start(
-                { facingMode: "environment" }, 
-                { 
-                    fps: 10, 
-                    qrbox: { width: 250, height: 250 } 
-                },
-                onScanSuccess,
-                onScanFailure
-            ).catch(err => {
-                statusDiv.textContent = 'Error: Cannot start camera. Check permissions.';
-            });
+            // This 1-second delay fixes bugs on some mobile phones
+            setTimeout(() => {
+                html5QrCode.start(
+                    { facingMode: "environment" }, 
+                    { 
+                        fps: 10, 
+                        qrbox: { width: 250, height: 250 } 
+                    },
+                    onScanSuccess,
+                    onScanFailure
+                ).catch(err => {
+                    statusDiv.textContent = 'Error: Cannot start camera. Check permissions.';
+                });
+            }, 1000); // 1000ms = 1 second delay
         });
 
         function onScanSuccess(decodedText, decodedResult) {
@@ -193,7 +189,6 @@
         batchIdInput.addEventListener('input', updateInstruction);
 
         
-        // --- THIS IS THE UPDATED FUNCTION ---
         function updateInstruction() {
             const batchId = batchIdInput.value;
             if (!batchId) {
@@ -203,13 +198,11 @@
             }
             
             if (!lastAction) {
-                // This message is just a temporary instruction
                 instructionText.value = `Scanned: ${batchId}. Now select START or FINISH.`;
                 formBtn.disabled = true;
                 return;
             }
             
-            // Get current date and time
             const now = new Date();
             const dateTimeString = now.toLocaleString('en-US', { 
                 year: 'numeric', 
@@ -217,9 +210,8 @@
                 day: 'numeric', 
                 hour: '2-digit', 
                 minute: '2-digit' 
-            }); // e.g., "11/3/2025, 8:31 PM"
+            });
             
-            // This is your new, clean data format
             instructionText.value = `${batchId}, ${lastAction}, ${dateTimeString}`;
             formBtn.disabled = false;
         }
@@ -235,7 +227,6 @@
 
             const url = new URL(FORMS_URL);
             
-            // This is the simple, reliable pre-fill method.
             url.searchParams.set(BATCH_PARAM_NAME, instructionText.value);
             
             window.location.href = url.toString();
