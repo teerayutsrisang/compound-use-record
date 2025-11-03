@@ -134,8 +134,7 @@
     <script>
         const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
         
-        // --- !!! IMPORTANT !!! ---
-        // You MUST find the correct ID for your form's question.
+        // This is your correct Question ID
         const BATCH_PARAM_NAME = "r64dd8a4e83d44a31b54a97344fe84d3a"; 
         
         const scanBtn = document.getElementById('scan-btn');
@@ -149,7 +148,6 @@
         
         let lastAction = "";
         
-        // This is the scanner object
         const html5QrCode = new Html5Qrcode("qr-reader");
 
         scanBtn.addEventListener('click', () => {
@@ -215,6 +213,7 @@
             formBtn.disabled = false;
         }
 
+        // --- THIS IS THE FIX ---
         formBtn.addEventListener('click', () => {
             const batchId = batchIdInput.value;
             
@@ -225,17 +224,13 @@
 
             const url = new URL(FORMS_URL);
             
-            // This is the official way to pre-fill multiple fields.
-            const prefillData = {
-                [BATCH_PARAM_NAME]: instructionText.value
-            };
-            
-            url.searchParams.set('data', JSON.stringify(prefillData));
+            // This is the simple, more reliable pre-fill method.
+            // It adds '&r64dd8a4...=DATA' to the URL.
+            url.searchParams.set(BATCH_PARAM_NAME, instructionText.value);
             
             window.location.href = url.toString();
         });
 
     </script>
 </body>
-
 </html>
