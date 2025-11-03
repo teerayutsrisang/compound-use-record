@@ -6,7 +6,6 @@
     <title>Batch Scanner (to MS Form)</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
-        /* All the CSS styles are exactly the same as before */
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             margin: 0; 
@@ -23,6 +22,7 @@
             padding: 20px; 
         }
         h1 { text-align: center; margin-top: 0; }
+        
         #qr-reader {
             width: 100%;
             border: 1px solid #ccc;
@@ -30,6 +30,7 @@
             margin-top: 15px;
             display: none; 
         }
+
         #scan-btn {
             width: 100%;
             font-size: 1.5em;
@@ -40,6 +41,7 @@
             border-radius: 8px;
             cursor: pointer;
         }
+        
         .label {
             font-size: 12px;
             color: #6c757d;
@@ -57,6 +59,7 @@
             text-align: center;
             box-sizing: border-box;
         }
+        
         .button-grid { 
             display: grid; 
             grid-template-columns: 1fr 1fr; 
@@ -71,8 +74,10 @@
             cursor: pointer;
             color: white;
         }
+        
         #btn-start { background-color: #28a745; }
         #btn-finish { background-color: #dc3545; }
+        
         #instruction {
             width: 100%;
             box-sizing: border-box;
@@ -84,11 +89,13 @@
             background: #f4f4f9;
             min-height: 80px;
         }
+        
         #btn-form {
             width: 100%;
             margin-top: 15px;
             background: #6c757d;
         }
+        
         #status { 
             margin-top: 15px; 
             font-weight: bold; 
@@ -127,6 +134,7 @@
     <script>
         const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
         
+        // This is your correct Question ID
         const BATCH_PARAM_NAME = "r64dd8a4e83d44a31b54a97344fe84d3a"; 
         
         const scanBtn = document.getElementById('scan-btn');
@@ -142,7 +150,6 @@
         
         const html5QrCode = new Html5Qrcode("qr-reader");
 
-        // --- THIS FUNCTION IS NOW UPDATED ---
         scanBtn.addEventListener('click', () => {
             qrReaderDiv.style.display = 'block';
             statusDiv.textContent = 'Starting camera...';
@@ -182,13 +189,14 @@
         });
         
         finishBtn.addEventListener('click', () => {
-            lastAction = 'FINISH';
+            lastAction = 'FINISHED'; // Changed from 'FINISH'
             updateInstruction();
         });
         
         batchIdInput.addEventListener('input', updateInstruction);
 
         
+        // --- THIS IS THE UPDATED FUNCTION ---
         function updateInstruction() {
             const batchId = batchIdInput.value;
             if (!batchId) {
@@ -198,21 +206,30 @@
             }
             
             if (!lastAction) {
+                // This message is just a temporary instruction
                 instructionText.value = `Scanned: ${batchId}. Now select START or FINISH.`;
                 formBtn.disabled = true;
                 return;
             }
             
             const now = new Date();
-            const dateTimeString = now.toLocaleString('en-US', { 
-                year: 'numeric', 
-                month: 'numeric', 
-                day: 'numeric', 
-                hour: '2-digit', 
-                minute: '2-digit' 
+            
+            // Get Date Part: DD/MM/YYYY (e.g., 03/11/2025)
+            const dateString = now.toLocaleDateString('en-GB', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric' 
             });
             
-            instructionText.value = `${batchId}, ${lastAction}, ${dateTimeString}`;
+            // Get Time Part: HH:MM (e.g., 18:31)
+            const timeString = now.toLocaleTimeString('en-GB', { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                hour12: false 
+            });
+            
+            // Combine into the final format
+            instructionText.value = `${batchId}, ${lastAction}, ${dateString} ${timeString}`;
             formBtn.disabled = false;
         }
 
@@ -227,6 +244,7 @@
 
             const url = new URL(FORMS_URL);
             
+            // This is the simple, reliable pre-fill method.
             url.searchParams.set(BATCH_PARAM_NAME, instructionText.value);
             
             window.location.href = url.toString();
