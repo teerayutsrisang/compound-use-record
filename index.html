@@ -1,343 +1,185 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Batch Scanner (to MS Form)</title>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-    <style>
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            margin: 0; 
-            padding: 10px; 
-            background-color: #f4f4f9; 
-            color: #333;
-        }
-        #container { 
-            max-width: 600px; 
-            margin: 0 auto; 
-            background: #fff; 
-            border-radius: 10px; 
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
-            padding: 20px; 
-        }
-        h1 { text-align: center; margin-top: 0; }
-        
-        #qr-reader {
-            width: 100%;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            margin-top: 15px;
-            display: none; 
-        }
-
-        #scan-btn {
-            width: 100%;
-            font-size: 1.5em;
-            padding: 20px;
-            background: #007bff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-        
-        .label {
-            font-size: 12px;
-            color: #6c757d;
-            margin: 15px 0 5px 0;
-        }
-        
-        .input-row {
-            display: flex;
-            gap: 10px;
-        }
-        
-        .resultInput {
-            padding: 12px;
-            border-radius: 12px;
-            border: 1px solid #ccc;
-            background: #f4f4f9;
-            color: #333;
-            font-weight: bold;
-            font-size: 24px;
-            text-align: center;
-            box-sizing: border-box;
-            /* NEW: Make date/time inputs look good */
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI";
-            font-size: 1.2em; /* Make date/time smaller */
-        }
-        
-        #batch-id {
-            flex-grow: 1;
-            width: 70%;
-            font-size: 24px; /* Keep batch ID big */
-        }
-        
-        #manual-code {
-            width: 80px; 
-            flex-shrink: 0;
-            font-size: 24px; /* Keep manual code big */
-        }
-        
-        /* --- NEW: Style for Date/Time inputs --- */
-        #manual-date {
-            width: 60%;
-        }
-        #manual-time {
-            width: 40%;
-        }
-        
-        .button-grid { 
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 15px; 
-            margin-top: 15px;
-        }
-        .action-btn, #btn-form {
-            font-size: 1.2em;
-            padding: 20px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            color: white;
-        }
-        
-        #btn-start { background-color: #28a745; }
-        #btn-finish { background-color: #dc3545; }
-        
-        #instruction {
-            width: 100%;
-            box-sizing: border-box;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            font-family: monospace;
-            background: #f4f4f9;
-            font-size: 1.5em; 
-            font-weight: bold;
-            min-height: 120px;
-        }
-        
-        #btn-form {
-            width: 100%;
-            margin-top: 15px;
-            background: #6c757d;
-        }
-        
-        #status { 
-            margin-top: 15px; 
-            font-weight: bold; 
-            text-align: center; 
-            font-size: 1em; 
-            color: #007bff;
-            min-height: 1.5em;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Batch Scanner (to MS Form)</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;margin:0;padding:10px;background:#f4f4f9;color:#333}
+    #container{max-width:600px;margin:0 auto;background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.1);padding:20px}
+    h1{text-align:center;margin-top:0}
+    #qr-reader{width:100%;border:1px solid #ccc;border-radius:8px;margin-top:15px;display:none}
+    #scan-btn{width:100%;font-size:1.5em;padding:20px;background:#007bff;color:#fff;border:none;border-radius:8px;cursor:pointer}
+    .label{font-size:12px;color:#6c757d;margin:15px 0 5px 0}
+    .input-row{display:flex;gap:10px}
+    .resultInput{padding:12px;border-radius:12px;border:1px solid #ccc;background:#f4f4f9;color:#333;font-weight:bold;font-size:24px;text-align:center;box-sizing:border-box}
+    #batch-id{flex-grow:1;width:70%;font-size:24px}
+    #manual-code{width:80px;flex-shrink:0;font-size:24px}
+    #manual-date{width:60%;font-size:1.2em}
+    #manual-time{width:40%;font-size:1.2em}
+    .button-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px;margin-top:15px}
+    .action-btn,#btn-form{font-size:1.2em;padding:20px;border:none;border-radius:8px;cursor:pointer;color:#fff}
+    #btn-start{background:#28a745}
+    #btn-finish{background:#dc3545}
+    #instruction{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #ccc;font-family:monospace;background:#f4f4f9;font-size:1.5em;font-weight:bold;min-height:120px}
+    #btn-form{width:100%;margin-top:15px;background:#6c757d}
+    #status{margin-top:15px;font-weight:bold;text-align:center;font-size:1em;color:#007bff;min-height:1.5em}
+  </style>
 </head>
 <body>
+  <div id="container">
+    <h1>Batch Logger</h1>
 
-    <div id="container">
-        <h1>Batch Logger</h1>
-        
-        <button id="scan-btn">1. Scan Batch</button>
-        
-        <div id="qr-reader"></div>
+    <button id="scan-btn">1. Scan Batch</button>
+    <div id="qr-reader"></div>
 
-        <div class="label">Batch ID & Manual Code:</div>
-        <div class="input-row">
-            <input id="batch-id" class="resultInput" placeholder="Scan Batch ID...">
-            <input id="manual-code" class="resultInput" placeholder="000" maxlength="3">
-        </div>
-
-        <div class="button-grid">
-            <button id="btn-start" class="action-btn">2. START USE</button>
-            <button id="btn-finish" class="action-btn">2. FINISH USED</button>
-        </div>
-        
-        <div class="label">Adjust Date & Time (if needed):</div>
-        <div class="input-row">
-            <input type="date" id="manual-date" class="resultInput">
-            <input type="time" id="manual-time" class="resultInput">
-        </div>
-        
-        <div class="label">Data to Record:</div>
-        <textarea id="instruction" readonly>Scan a code and select an action...</textarea>
-
-        <button id="btn-form" disabled>3. Copy Data & Go to Form</button>
-        
-        <div id="status"></div>
+    <div class="label">Batch ID & Manual Code:</div>
+    <div class="input-row">
+      <input id="batch-id" class="resultInput" placeholder="Scan Batch ID..." />
+      <input id="manual-code" class="resultInput" placeholder="000" maxlength="3" />
     </div>
 
-    <script>
-        const FORMS_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
-        
-        const scanBtn = document.getElementById('scan-btn');
-        const qrReaderDiv = document.getElementById('qr-reader');
-        const batchIdInput = document.getElementById('batch-id');
-        const manualCodeInput = document.getElementById('manual-code');
-        const startBtn = document.getElementById('btn-start');
-        const finishBtn = document.getElementById('btn-finish');
-        
-        // --- NEW: Get the Date/Time inputs ---
-        const manualDateInput = document.getElementById('manual-date');
-        const manualTimeInput = document.getElementById('manual-time');
-        
-        const instructionText = document.getElementById('instruction');
-        const formBtn = document.getElementById('btn-form');
-        const statusDiv = document.getElementById('status');
-        
-        let lastAction = "";
-        
-        const html5QrCode = new Html5Qrcode("qr-reader");
+    <div class="button-grid">
+      <button id="btn-start" class="action-btn">2. START USE</button>
+      <button id="btn-finish" class="action-btn">2. FINISH USED</button>
+    </div>
 
-        // --- Helper function to format date for <input type="date"> ---
-        function getISODate(date) {
-            return date.getFullYear() + '-' + 
-                   ('0' + (date.getMonth() + 1)).slice(-2) + '-' + 
-                   ('0' + date.getDate()).slice(-2);
-        }
-        
-        // --- Helper function to format time for <input type="time"> ---
-        function getISOTime(date) {
-            return ('0' + date.getHours()).slice(-2) + ':' + 
-                   ('0' + date.getMinutes()).slice(-2);
-        }
+    <div class="label">Adjust Date & Time (if needed):</div>
+    <div class="input-row">
+      <input type="date" id="manual-date" class="resultInput" />
+      <input type="time" id="manual-time" class="resultInput" />
+    </div>
 
+    <div class="label">Data to Record:</div>
+    <textarea id="instruction" readonly>Scan a code and select an action...</textarea>
 
-        scanBtn.addEventListener('click', () => {
-            qrReaderDiv.style.display = 'block';
-            statusDiv.textContent = 'Starting camera...';
-            
-            setTimeout(() => {
-                html5QrCode.start(
-                    { facingMode: "environment" }, 
-                    { 
-                        fps: 10, 
-                        qrbox: { width: 250, height: 250 } 
-                    },
-                    onScanSuccess,
-                    onScanFailure
-                ).catch(err => {
-                    statusDiv.textContent = 'Error: Cannot start camera. Check permissions.';
-                });
-            }, 1000); 
-        });
+    <button id="btn-form" disabled>3. Go to Form (prefilled)</button>
+    <div id="status"></div>
+  </div>
 
-        function onScanSuccess(decodedText, decodedResult) {
-            html5QrCode.stop().catch(err => console.warn("Scanner stop failed."));
-            qrReaderDiv.style.display = 'none';
-            
-            batchIdInput.value = decodedText;
-            statusDiv.textContent = `Scan Successful: ${decodedText}`;
-            updateInstruction();
-            manualCodeInput.focus();
-        }
+  <script>
+    // Your base Forms URL (not used once prefill is set, kept as fallback)
+    const FORMS_URL =
+      "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u";
 
-        function onScanFailure(error) {
-            // ignore
-        }
+    // PREFILL TEMPLATE using your parameter name:
+    // We replace only the value with our live text.
+    const PREFILL_TEMPLATE =
+      "https://forms.office.com/Pages/ResponsePage.aspx?id=EhsYHpKcZU2onbGGEHzETbeUVW5sz-BJrp_dYv8vQNtUNDVIWkJJTFBYUzVXTDRQVU1VQ0tTQ1JBMS4u"
+      + "&r64dd8a4e83d44a31b54a97344fe84d3a=__TEXT__";
 
-        // --- UPDATED: Button click listeners ---
-        startBtn.addEventListener('click', () => {
-            lastAction = 'START';
-            // Auto-fill the current date and time
-            const now = new Date();
-            manualDateInput.value = getISODate(now);
-            manualTimeInput.value = getISOTime(now);
-            updateInstruction();
-        });
-        
-        finishBtn.addEventListener('click', () => {
-            lastAction = 'FINISHED'; 
-            // Auto-fill the current date and time
-            const now = new Date();
-            manualDateInput.value = getISODate(now);
-            manualTimeInput.value = getISOTime(now);
-            updateInstruction();
-        });
-        
-        batchIdInput.addEventListener('input', updateInstruction);
-        manualCodeInput.addEventListener('input', updateInstruction);
-        
-        // --- NEW: Listen for changes to date/time inputs ---
-        manualDateInput.addEventListener('input', updateInstruction);
-        manualTimeInput.addEventListener('input', updateInstruction);
-        
+    // ==== UI refs ====
+    const scanBtn = document.getElementById("scan-btn");
+    const qrReaderDiv = document.getElementById("qr-reader");
+    const batchIdInput = document.getElementById("batch-id");
+    const manualCodeInput = document.getElementById("manual-code");
+    const startBtn = document.getElementById("btn-start");
+    const finishBtn = document.getElementById("btn-finish");
+    const manualDateInput = document.getElementById("manual-date");
+    const manualTimeInput = document.getElementById("manual-time");
+    const instructionText = document.getElementById("instruction");
+    const formBtn = document.getElementById("btn-form");
+    const statusDiv = document.getElementById("status");
 
-        
-        // --- THIS IS THE UPDATED FUNCTION ---
-        function updateInstruction() {
-            const batchId = batchIdInput.value;
-            const manualCode = manualCodeInput.value;
-            
-            // --- NEW: Get date and time from the inputs ---
-            const dateValue = manualDateInput.value; // Format: YYYY-MM-DD
-            const timeValue = manualTimeInput.value; // Format: HH:MM
+    let lastAction = "";
+    let html5QrCode = null;
 
-            if (!batchId) {
-                instructionText.value = '1. Scan a code...';
-                formBtn.disabled = true;
-                return;
-            }
-            
-            if (!manualCode) {
-                instructionText.value = `Scanned: ${batchId}. \n2. Enter 3-digit code.`;
-                formBtn.disabled = true;
-                return;
-            }
-            
-            if (!lastAction) {
-                instructionText.value = `Data: ${batchId} ${manualCode}. \n3. Select START or FINISH.`;
-                formBtn.disabled = true;
-                return;
-            }
+    function getISODate(d){return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+    function getISOTime(d){return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")}
 
-            // --- NEW: Check if date/time are filled ---
-            if (!dateValue || !timeValue) {
-                instructionText.value = `Data: ${batchId} ${manualCode}. \nAction: ${lastAction}. \n4. Date/Time is loading...`;
-                formBtn.disabled = true;
-                return;
-            }
-            
-            // --- NEW: Format date from YYYY-MM-DD to DD/MM/YYYY ---
-            const dateParts = dateValue.split('-');
-            const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
-            
-            // Time value is already in HH:MM format
-            
-            // --- NEW: Create the final 3-line text string ---
-            instructionText.value = `${batchId} ${manualCode},\n${lastAction},\n${formattedDate} ${timeValue}`;
-            formBtn.disabled = false;
-        }
+    // Start camera + scanner
+    scanBtn.addEventListener("click", async () => {
+      try{
+        if(!html5QrCode){ html5QrCode = new Html5Qrcode("qr-reader"); }
+        qrReaderDiv.style.display = "block";
+        statusDiv.textContent = "Starting camera...";
+        await html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          onScanSuccess,
+          () => {} // ignore failures
+        );
+      }catch(e){
+        statusDiv.textContent = "Error: Cannot start camera. Check HTTPS & permission.";
+      }
+    });
 
-        
-        formBtn.addEventListener('click', () => {
-            // Check all 4 pieces of data
-            if (!batchIdInput.value || !manualCodeInput.value || !lastAction || !manualDateInput.value || !manualTimeInput.value) {
-                alert("Please fill in all fields: Scan, Code, Action, and Date/Time.");
-                return;
-            }
+    async function stopScanner(){
+      try{ if(html5QrCode){ await html5QrCode.stop(); } }catch(_){}
+      qrReaderDiv.style.display = "none";
+    }
 
-            const dataToCopy = instructionText.value;
+    function onScanSuccess(decodedText){
+      stopScanner();
+      batchIdInput.value = decodedText;
+      statusDiv.textContent = `Scan Successful: ${decodedText}`;
+      updateInstruction();
+      manualCodeInput.focus();
+    }
 
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(dataToCopy)
-                    .then(() => {
-                        statusDiv.textContent = "Data copied! Opening form...";
-                        window.location.href = FORMS_URL; 
-                    })
-                    .catch(err => {
-                        console.error("Failed to copy text: ", err);
-                        alert("Failed to copy data. Opening form.");
-                        window.location.href = FORMS_URL;
-                    });
-            } else {
-                alert("Clipboard API not available. Opening form.");
-                window.location.href = FORMS_URL;
-            }
-        });
+    // Action buttons
+    startBtn.addEventListener("click", () => {
+      lastAction = "START USE";
+      const now = new Date();
+      manualDateInput.value = getISODate(now);
+      manualTimeInput.value = getISOTime(now);
+      updateInstruction();
+    });
 
-    </script>
+    finishBtn.addEventListener("click", () => {
+      lastAction = "FINISH USED";
+      const now = new Date();
+      manualDateInput.value = getISODate(now);
+      manualTimeInput.value = getISOTime(now);
+      updateInstruction();
+    });
+
+    // Input listeners
+    [batchIdInput, manualCodeInput, manualDateInput, manualTimeInput]
+      .forEach(el => el.addEventListener("input", updateInstruction));
+
+    function updateInstruction(){
+      const batchId = batchIdInput.value.trim();
+      const manualCode = manualCodeInput.value.trim();
+      const dateValue = manualDateInput.value;   // YYYY-MM-DD
+      const timeValue = manualTimeInput.value;   // HH:MM
+
+      if(!batchId){ instructionText.value = "1. Scan a code..."; formBtn.disabled = true; return; }
+      if(!manualCode){ instructionText.value = `Scanned: ${batchId}.\n2. Enter 3-digit code.`; formBtn.disabled = true; return; }
+      if(!lastAction){ instructionText.value = `Data: ${batchId} ${manualCode}.\n3. Select START or FINISH.`; formBtn.disabled = true; return; }
+      if(!dateValue || !timeValue){ instructionText.value = `Data: ${batchId} ${manualCode}.\nAction: ${lastAction}.\n4. Date/Time is loading...`; formBtn.disabled = true; return; }
+
+      const [yyyy, mm, dd] = dateValue.split("-");
+      const formattedDateTime = `${dd}/${mm}/${yyyy} ${timeValue}`;
+      instructionText.value = `${batchId} ${manualCode}, ${lastAction}, ${formattedDateTime}`;
+      formBtn.disabled = false;
+    }
+
+    formBtn.addEventListener("click", () => {
+      const code = batchIdInput.value.trim();
+      const manual = manualCodeInput.value.trim();
+      const dateValue = manualDateInput.value;
+      const timeValue = manualTimeInput.value;
+
+      if(!code || !manual || !lastAction || !dateValue || !timeValue){
+        alert("Please fill Scan, Code, Action and Date/Time.");
+        return;
+      }
+
+      const [yyyy, mm, dd] = dateValue.split("-");
+      const dtDisplay = `${dd}/${mm}/${yyyy} ${timeValue}`;
+
+      // Compose the single answer text for Question 1
+      const prefillText = `${code} ${manual}, ${lastAction}, ${dtDisplay}`;
+
+      // Optional: copy to clipboard for backup
+      try{ navigator.clipboard.writeText(prefillText); }catch(_){}
+
+      // Open MS Form already filled
+      const url = PREFILL_TEMPLATE.replace("__TEXT__", encodeURIComponent(prefillText));
+      window.location.href = url;
+    });
+  </script>
 </body>
 </html>
